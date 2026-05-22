@@ -4,20 +4,19 @@ import {
 	CheckCircle2,
 	Copy,
 	ExternalLink,
-	Link2,
 	Mail,
+	MonitorSmartphone,
 	ShieldCheck,
-	Trash2,
 	XCircle,
 } from 'lucide-react'
 import type { Account } from '../shared/models'
+import InboxPage from './pages/InboxPage'
 
 const BYOC_GUIDE_URL = 'https://developers.google.com/identity/protocols/oauth2/native-app'
 const GOOGLE_CONSOLE_URL = 'https://console.cloud.google.com/'
 const GOOGLE_CREDENTIALS_URL = 'https://console.cloud.google.com/apis/credentials'
 
-type Page = 'home' | 'gmailSetup'
-
+type Page = 'hub' | 'setupHub' | 'gmailSetup' | 'outlookSetup' | 'inbox'
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'neutral'
 
 const panelStyle: CSSProperties = {
@@ -40,22 +39,13 @@ const baseButtonStyle: CSSProperties = {
 }
 
 const buttonVariantStyle = (variant: ButtonVariant): CSSProperties => {
-	if (variant === 'primary') {
-		return { background: '#0f172a', color: '#ffffff' }
-	}
-	if (variant === 'danger') {
-		return { background: '#b91c1c', color: '#ffffff' }
-	}
-	if (variant === 'secondary') {
-		return { background: '#0369a1', color: '#ffffff' }
-	}
+	if (variant === 'primary') return { background: '#0f172a', color: '#ffffff' }
+	if (variant === 'danger') return { background: '#b91c1c', color: '#ffffff' }
+	if (variant === 'secondary') return { background: '#0369a1', color: '#ffffff' }
 	return { background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }
 }
 
-const disabledStyle: CSSProperties = {
-	opacity: 0.6,
-	cursor: 'not-allowed',
-}
+const disabledStyle: CSSProperties = { opacity: 0.6, cursor: 'not-allowed' }
 
 const chipStyle: CSSProperties = {
 	display: 'inline-flex',
@@ -100,16 +90,26 @@ const AppButton = ({
 )
 
 const App = (): ReactElement => {
-	const [page, setPage] = useState<Page>('home')
+	const [page, setPage] = useState<Page>('hub')
 	const [configured, setConfigured] = useState<boolean>(false)
 	const [isCheckingConfig, setIsCheckingConfig] = useState<boolean>(true)
-	const [account, setAccount] = useState<Account | null>(null)
+	const [accounts, setAccounts] = useState<readonly Account[]>([])
+	const [activeAccountId, setActiveAccountId] = useState<string>()
 	const [status, setStatus] = useState<string | null>(null)
 	const [error, setError] = useState<string | null>(null)
 	const [isLoading, setIsLoading] = useState<boolean>(false)
 	const [clientId, setClientId] = useState<string>('')
 	const [clientSecret, setClientSecret] = useState<string>('')
 	const [projectId, setProjectId] = useState<string>('')
+	const gmailAccounts = accounts.filter((account) => account.provider === 'gmail')
+	const outlookAccounts = accounts.filter((account) => account.provider === 'outlook')
+
+	const refreshAccounts = async (): Promise<void> => {
+		const result = await window.api['accounts:list']()
+		if (result.success && result.data) {
+			setAccounts(result.data)
+		}
+	}
 
 	const refreshConfigStatus = async (): Promise<void> => {
 		setIsCheckingConfig(true)
@@ -120,6 +120,7 @@ const App = (): ReactElement => {
 
 	useEffect(() => {
 		void refreshConfigStatus()
+		void refreshAccounts()
 	}, [])
 
 	const copyText = async (value: string, successMessage: string): Promise<void> => {
@@ -128,8 +129,7 @@ const App = (): ReactElement => {
 			setStatus(successMessage)
 			setError(null)
 		} catch (clipboardError) {
-			const message =
-				clipboardError instanceof Error ? clipboardError.message : 'Failed to copy text'
+			const message = clipboardError instanceof Error ? clipboardError.message : 'Failed to copy text'
 			setError(message)
 		}
 	}
@@ -149,6 +149,7 @@ const App = (): ReactElement => {
 			}
 			await refreshConfigStatus()
 			setStatus(`Saved config to ${result.data.path}`)
+			setPage('hub')
 		} catch (requestError) {
 			const message = requestError instanceof Error ? requestError.message : 'Unknown error'
 			setError(message)
@@ -162,6 +163,16 @@ const App = (): ReactElement => {
 		setError(null)
 		setStatus(null)
 		try {
+			const accountsResult = await window.api['accounts:list']()
+			if (!accountsResult.success || !accountsResult.data) {
+				throw new Error(accountsResult.error ?? 'Failed to list accounts before reset')
+			}
+			for (const account of accountsResult.data) {
+				if (account.provider === 'gmail') {
+					await window.api['accounts:remove'](account.id)
+				}
+			}
+
 			const result = await window.api['oauth:deleteGoogleConfig']()
 			if (!result.success || !result.data) {
 				throw new Error(result.error ?? 'Failed to delete Google OAuth config')
@@ -169,9 +180,13 @@ const App = (): ReactElement => {
 			setClientId('')
 			setClientSecret('')
 			setProjectId('')
-			setAccount(null)
+			await refreshAccounts()
 			await refreshConfigStatus()
-			setStatus(result.data.deleted ? 'Saved credentials deleted.' : 'No credentials found to delete.')
+			setStatus(
+				result.data.deleted
+					? 'Saved Gmail credentials deleted. Gmail accounts removed and tokens cleared.'
+					: 'No Gmail credentials file found. Gmail accounts were still cleared.'
+			)
 		} catch (requestError) {
 			const message = requestError instanceof Error ? requestError.message : 'Unknown error'
 			setError(message)
@@ -180,17 +195,36 @@ const App = (): ReactElement => {
 		}
 	}
 
-	const connectGmail = async (): Promise<void> => {
+	const connectProvider = async (provider: 'gmail' | 'outlook'): Promise<void> => {
 		setIsLoading(true)
 		setError(null)
-		setStatus('Waiting for Google sign-in callback...')
+		setStatus(`Waiting for ${provider === 'gmail' ? 'Google' : 'Microsoft'} sign-in callback...`)
 		try {
-			const result = await window.api['accounts:add']('gmail')
+			const result = await window.api['accounts:add'](provider)
 			if (!result.success || !result.data) {
-				throw new Error(result.error ?? 'Failed to connect Gmail account')
+				throw new Error(result.error ?? `Failed to connect ${provider} account`)
 			}
-			setAccount(result.data)
+			await refreshAccounts()
 			setStatus(`Connected ${result.data.email}`)
+		} catch (requestError) {
+			const message = requestError instanceof Error ? requestError.message : 'Unknown error'
+			setError(message)
+		} finally {
+			setIsLoading(false)
+		}
+	}
+
+	const removeAccount = async (account: Account): Promise<void> => {
+		setIsLoading(true)
+		setError(null)
+		setStatus(null)
+		try {
+			const result = await window.api['accounts:remove'](account.id)
+			if (!result.success) {
+				throw new Error(result.error ?? `Failed to remove ${account.provider} account`)
+			}
+			await refreshAccounts()
+			setStatus(`Removed ${account.email}`)
 		} catch (requestError) {
 			const message = requestError instanceof Error ? requestError.message : 'Unknown error'
 			setError(message)
@@ -204,6 +238,16 @@ const App = (): ReactElement => {
 		if (result.success) {
 			setStatus(result.data?.canceled ? 'Connection flow canceled.' : 'No active connection flow.')
 		}
+	}
+
+	if (page === 'inbox' && activeAccountId) {
+		return (
+			<InboxPage
+				activeAccountId={activeAccountId}
+				onBackToHub={() => setPage('hub')}
+				onResetGoogleCredentials={deleteByocConfig}
+			/>
+		)
 	}
 
 	if (isCheckingConfig) {
@@ -234,32 +278,39 @@ const App = (): ReactElement => {
 					<div>
 						<h1 style={{ margin: 0, fontSize: 32 }}>2Fast</h1>
 						<p style={{ margin: '6px 0 0', color: '#334155' }}>
-							Secure account onboarding for Gmail and future providers.
+							Central hub for Gmail and Outlook account connections.
 						</p>
 					</div>
 					<nav style={{ display: 'flex', gap: 8 }}>
-						<AppButton label="Home" onClick={() => setPage('home')} />
-						<AppButton label="Gmail Setup Guide" onClick={() => setPage('gmailSetup')} />
+						<AppButton label="Accounts Hub" onClick={() => setPage('hub')} />
+						<AppButton label="Setup Guide" onClick={() => setPage('setupHub')} />
 					</nav>
 				</header>
 
-				{page === 'home' ? (
+				{page === 'hub' ? (
 					<section style={{ display: 'grid', gap: 14 }}>
 						<div style={panelStyle}>
 							<h2 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-								<ShieldCheck size={19} /> Connection
+								<ShieldCheck size={19} /> Connect Accounts
 							</h2>
-							<div style={chipStyle}>
+							<div style={{ marginBottom: 12, ...chipStyle }}>
 								{configured ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-								{configured ? 'BYOC configured' : 'BYOC not configured'}
+								{configured ? 'Gmail BYOC configured' : 'Gmail BYOC not configured'}
 							</div>
 							<div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
 								<AppButton
 									label={isLoading ? 'Connecting...' : 'Connect Gmail'}
-									onClick={() => void connectGmail()}
+									onClick={() => void connectProvider('gmail')}
 									disabled={isLoading || !configured}
 									variant="secondary"
 									icon={<Mail size={16} />}
+								/>
+								<AppButton
+									label={isLoading ? 'Connecting...' : 'Connect Outlook'}
+									onClick={() => void connectProvider('outlook')}
+									disabled={isLoading}
+									variant="primary"
+									icon={<MonitorSmartphone size={16} />}
 								/>
 								<AppButton
 									label="Cancel Connection"
@@ -268,24 +319,124 @@ const App = (): ReactElement => {
 									variant="neutral"
 									icon={<XCircle size={16} />}
 								/>
-								<AppButton
-									label="Delete Saved Credentials"
-									onClick={() => void deleteByocConfig()}
-									disabled={isLoading}
-									variant="danger"
-									icon={<Trash2 size={16} />}
-								/>
 							</div>
-							{account ? <p style={{ marginBottom: 0 }}>Connected: {account.email}</p> : null}
 						</div>
 						<div style={panelStyle}>
-							<h2 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-								<Link2 size={19} /> Need Setup Help?
-							</h2>
-							<p style={{ marginTop: 0 }}>
-								Open the Gmail setup guide page to follow the full BYOC checklist.
+							<h2 style={{ marginTop: 0 }}>Linked Accounts</h2>
+							{accounts.length === 0 ? <p style={{ marginBottom: 0, color: '#475569' }}>No linked accounts yet.</p> : null}
+							<section style={{ marginTop: 12 }}>
+								<h3 style={{ marginTop: 0 }}>Gmail</h3>
+								{gmailAccounts.length === 0 ? (
+									<p style={{ marginBottom: 0, color: '#64748b' }}>No Gmail accounts linked.</p>
+								) : (
+									<div style={{ display: 'grid', gap: 10 }}>
+										{gmailAccounts.map((account) => (
+											<div
+												key={account.id}
+												style={{
+													padding: 12,
+													borderRadius: 12,
+													border: '1px solid #cbd5e1',
+													background: '#f8fafc',
+												}}
+											>
+												<button
+													type="button"
+													onClick={() => {
+														setActiveAccountId(account.id)
+														setPage('inbox')
+													}}
+													style={{
+														textAlign: 'left',
+														background: 'transparent',
+														border: 0,
+														padding: 0,
+														cursor: 'pointer',
+														width: '100%',
+													}}
+												>
+													<strong>{account.displayName}</strong>
+													<p style={{ margin: '4px 0 0', color: '#475569' }}>{account.email}</p>
+												</button>
+												<div style={{ marginTop: 8 }}>
+													<AppButton
+														label="Delete"
+														onClick={() => void removeAccount(account)}
+														disabled={isLoading}
+														variant="danger"
+													/>
+												</div>
+											</div>
+										))}
+									</div>
+								)}
+							</section>
+							<section style={{ marginTop: 16 }}>
+								<h3 style={{ marginTop: 0 }}>Outlook</h3>
+								{outlookAccounts.length === 0 ? (
+									<p style={{ marginBottom: 0, color: '#64748b' }}>No Outlook accounts linked.</p>
+								) : (
+									<div style={{ display: 'grid', gap: 10 }}>
+										{outlookAccounts.map((account) => (
+											<div
+												key={account.id}
+												style={{
+													padding: 12,
+													borderRadius: 12,
+													border: '1px solid #cbd5e1',
+													background: '#f8fafc',
+												}}
+											>
+												<button
+													type="button"
+													onClick={() => {
+														setActiveAccountId(account.id)
+														setPage('inbox')
+													}}
+													style={{
+														textAlign: 'left',
+														background: 'transparent',
+														border: 0,
+														padding: 0,
+														cursor: 'pointer',
+														width: '100%',
+													}}
+												>
+													<strong>{account.displayName}</strong>
+													<p style={{ margin: '4px 0 0', color: '#475569' }}>{account.email}</p>
+												</button>
+												<div style={{ marginTop: 8 }}>
+													<AppButton
+														label="Delete"
+														onClick={() => void removeAccount(account)}
+														disabled={isLoading}
+														variant="danger"
+													/>
+												</div>
+											</div>
+										))}
+									</div>
+								)}
+							</section>
+						</div>
+					</section>
+				) : null}
+
+				{page === 'setupHub' ? (
+					<section style={{ display: 'grid', gap: 14 }}>
+						<div style={panelStyle}>
+							<h2 style={{ marginTop: 0 }}>Setup Guide</h2>
+							<p style={{ color: '#475569' }}>
+								Choose which provider setup flow you want to open.
 							</p>
-							<AppButton label="Open Setup Guide" onClick={() => setPage('gmailSetup')} />
+							<div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+								<AppButton
+									label="Open Gmail Setup Guide"
+									onClick={() => setPage('gmailSetup')}
+									variant="secondary"
+									icon={<Mail size={16} />}
+								/>
+							</div>
 						</div>
 					</section>
 				) : null}
@@ -303,14 +454,11 @@ const App = (): ReactElement => {
 									<a href={GOOGLE_CONSOLE_URL} target="_blank" rel="noreferrer">
 										Open Console
 										<ExternalLink size={14} style={{ marginLeft: 4, verticalAlign: 'text-top' }} />
-									</a>
-									{' '}
+									</a>{' '}
 									<button
 										type="button"
 										aria-label="Copy Google Cloud Console link"
-										onClick={() =>
-											void copyText(GOOGLE_CONSOLE_URL, 'Google Console link copied.')
-										}
+										onClick={() => void copyText(GOOGLE_CONSOLE_URL, 'Google Console link copied.')}
 										style={{ borderRadius: 8, border: '1px solid #cbd5e1', padding: '2px 6px' }}
 									>
 										<Copy size={14} />
@@ -318,34 +466,35 @@ const App = (): ReactElement => {
 								</li>
 								<li>Create a project named Personal, or use an existing project.</li>
 								<li>
-									Switch to the selected project and go to APIs &amp; Services → Credentials.{' '}
+									Switch to the selected project and go to APIs &amp; Services -&gt; Credentials.{' '}
 									<a href={GOOGLE_CREDENTIALS_URL} target="_blank" rel="noreferrer">
 										Open Credentials
 										<ExternalLink size={14} style={{ marginLeft: 4, verticalAlign: 'text-top' }} />
-									</a>
-									{' '}
+									</a>{' '}
 									<button
 										type="button"
 										aria-label="Copy Google Credentials link"
-										onClick={() =>
-											void copyText(GOOGLE_CREDENTIALS_URL, 'Credentials link copied.')
-										}
+										onClick={() => void copyText(GOOGLE_CREDENTIALS_URL, 'Credentials link copied.')}
 										style={{ borderRadius: 8, border: '1px solid #cbd5e1', padding: '2px 6px' }}
 									>
 										<Copy size={14} />
 									</button>
 								</li>
 								<li>
-									Configure consent screen: app name `2FAst`, support email = your Gmail,
-									audience = External, contact email = your email, then finish and create.
+									Configure consent screen: app name `2FAst`, support email = your Gmail, audience =
+									External, contact email = your email, then finish and create.
 								</li>
 								<li>
-									Go to Data Access → Add or Remove Scopes → add scope
+									Go to Data Access -&gt; Add or Remove Scopes -&gt; add scope
 									`https://www.googleapis.com/auth/gmail.readonly` and update.
+								</li>
+								<li>
+									Go to APIs &amp; Services -&gt; Enabled APIs and Services, click Enable APIs
+									and Services, search for Gmail API, and click Enable.
 								</li>
 								<li>Go to Audience and add your email as a test user.</li>
 								<li>
-									Go to Clients → Create → Application type = Desktop app, then copy client ID
+									Go to Clients -&gt; Create -&gt; Application type = Desktop app, then copy client ID
 									and client secret.
 								</li>
 							</ol>
@@ -354,8 +503,7 @@ const App = (): ReactElement => {
 								<a href={BYOC_GUIDE_URL} target="_blank" rel="noreferrer">
 									Google OAuth for Desktop Apps
 									<ExternalLink size={14} style={{ marginLeft: 4, verticalAlign: 'text-top' }} />
-								</a>
-								{' '}
+								</a>{' '}
 								<button
 									type="button"
 									aria-label="Copy OAuth guide link"
@@ -367,7 +515,7 @@ const App = (): ReactElement => {
 							</p>
 						</div>
 						<div style={panelStyle}>
-							<h2 style={{ marginTop: 0 }}>Enter Credentials</h2>
+							<h2 style={{ marginTop: 0 }}>Enter Gmail Credentials</h2>
 							<div style={{ display: 'grid', gap: 12, maxWidth: 650 }}>
 								<label>
 									Client ID
@@ -419,15 +567,32 @@ const App = (): ReactElement => {
 										variant="primary"
 										icon={<CheckCircle2 size={16} />}
 									/>
-									<AppButton label="Back to Home" onClick={() => setPage('home')} />
+									<AppButton label="Back to Hub" onClick={() => setPage('hub')} />
 								</div>
 							</div>
 						</div>
 					</section>
 				) : null}
 
+				{page === 'outlookSetup' ? (
+					<section style={{ display: 'grid', gap: 14 }}>
+						<div style={panelStyle}>
+							<h2 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+								<MonitorSmartphone size={19} /> Outlook Setup Guide
+							</h2>
+							<p style={{ marginBottom: 0, color: '#64748b' }}>
+								This page is intentionally blank for now. You can add Microsoft setup steps here next.
+							</p>
+						</div>
+					</section>
+				) : null}
+
 				{status ? <p style={{ color: '#166534', marginTop: 14 }}>{status}</p> : null}
-				{error ? <p role="alert" style={{ color: '#b91c1c', marginTop: 14 }}>{error}</p> : null}
+				{error ? (
+					<p role="alert" style={{ color: '#b91c1c', marginTop: 14 }}>
+						{error}
+					</p>
+				) : null}
 			</section>
 		</main>
 	)

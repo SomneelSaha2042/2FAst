@@ -3,6 +3,10 @@ import { randomUUID } from 'node:crypto'
 import { google } from 'googleapis'
 import type { Account, Provider } from '../../shared/models.js'
 import { loadGoogleOAuthConfig, type GoogleOAuthConfig } from '../oauth/google-config.js'
+import { acquireMicrosoftAccessToken, runMicrosoftOAuthFlow } from '../oauth/microsoft-auth.js'
+import { GmailProvider } from '../providers/gmail.js'
+import { OutlookProvider } from '../providers/outlook.js'
+import type { MailProvider } from '../providers/types.js'
 import {
 	runOAuthFlow,
 	type OAuthConfig,
@@ -17,7 +21,7 @@ interface AccountStoreShape {
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GOOGLE_SCOPES = [
-	'https://www.googleapis.com/auth/gmail.modify',
+	'https://www.googleapis.com/auth/gmail.readonly',
 	'https://www.googleapis.com/auth/userinfo.email',
 	'https://www.googleapis.com/auth/userinfo.profile',
 ] as const
@@ -65,6 +69,25 @@ export class AccountManager {
 	}
 
 	/**
+	 * Adds a new Microsoft account by completing OAuth and loading profile.
+	 * @returns Created account record stored in metadata store.
+	 */
+	async addMicrosoftAccount(): Promise<Account> {
+		const accountId = randomUUID()
+		await runMicrosoftOAuthFlow(accountId)
+		const profile = await this.fetchMicrosoftProfile(accountId)
+		const account: Account = {
+			id: accountId,
+			provider: 'outlook',
+			email: profile.email,
+			displayName: profile.displayName,
+		}
+		const accounts = this.store.get('accounts')
+		this.store.set('accounts', [...accounts, account])
+		return account
+	}
+
+	/**
 	 * Lists all stored account metadata.
 	 * @returns Immutable array of account records.
 	 */
@@ -99,21 +122,52 @@ export class AccountManager {
 	 * @returns Created account metadata.
 	 */
 	async addAccount(provider: Provider): Promise<Account> {
-		if (provider !== 'gmail') {
-			throw new Error('Only Gmail is supported in Phase 3')
+		if (provider === 'gmail') {
+			return this.addGoogleAccount()
 		}
-		return this.addGoogleAccount()
+		if (provider === 'outlook') {
+			return this.addMicrosoftAccount()
+		}
+		throw new Error(`Unsupported provider: ${provider}`)
+	}
+
+	/**
+	 * Resolves an authenticated provider implementation for an account.
+	 * @param accountId Internal account identifier.
+	 * @returns Mail provider bound to account credentials.
+	 */
+	async getProvider(accountId: string): Promise<MailProvider> {
+		const account = this.getAccount(accountId)
+		if (!account) {
+			throw new Error(`Account not found: ${accountId}`)
+		}
+		if (account.provider !== 'gmail') {
+			if (account.provider === 'outlook') {
+				const accessToken = await acquireMicrosoftAccessToken(account.id)
+				return new OutlookProvider(account.id, accessToken)
+			}
+			throw new Error(`Unsupported provider: ${account.provider}`)
+		}
+
+		const oauthConfig = await this.getGoogleOAuthConfig()
+		return new GmailProvider(account.id, oauthConfig.client_id, oauthConfig.client_secret)
 	}
 
 	private async getGoogleOAuthConfig(): Promise<GoogleOAuthConfig> {
-		if (!this.googleConfig) {
-			const config = await loadGoogleOAuthConfig()
-			if (!config) {
-				throw new Error('Google OAuth config is missing. Complete BYOC setup first.')
-			}
+		const config = await loadGoogleOAuthConfig()
+		if (!config) {
+			this.googleConfig = null
+			throw new Error('Google OAuth config is missing. Complete BYOC setup first.')
+		}
+		if (
+			!this.googleConfig ||
+			this.googleConfig.client_id !== config.client_id ||
+			this.googleConfig.client_secret !== config.client_secret ||
+			this.googleConfig.project_id !== config.project_id
+		) {
 			this.googleConfig = config
 		}
-		return this.googleConfig
+		return config
 	}
 
 	private async fetchGoogleProfile(
@@ -137,6 +191,35 @@ export class AccountManager {
 			email: data.email,
 			displayName: data.name ?? data.email,
 			avatarUrl: data.picture ?? undefined,
+		}
+	}
+
+	private async fetchMicrosoftProfile(
+		accountId: string
+	): Promise<{ email: string; displayName: string }> {
+		const accessToken = await acquireMicrosoftAccessToken(accountId)
+		const response = await fetch('https://graph.microsoft.com/v1.0/me', {
+			headers: {
+				Authorization: `Bearer ${accessToken}`,
+				Accept: 'application/json',
+			},
+		})
+		if (!response.ok) {
+			const detail = await response.text()
+			throw new Error(`Failed to fetch Microsoft profile (${response.status}): ${detail}`)
+		}
+		const payload = (await response.json()) as {
+			readonly displayName?: string
+			readonly mail?: string
+			readonly userPrincipalName?: string
+		}
+		const email = payload.mail ?? payload.userPrincipalName
+		if (!email) {
+			throw new Error('Microsoft profile did not include an email address')
+		}
+		return {
+			email,
+			displayName: payload.displayName ?? email,
 		}
 	}
 }

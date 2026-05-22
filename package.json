@@ -12,6 +12,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@azure/msal-node": "^5.2.2",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "electron": "^42.2.0",
     "electron-store": "^11.0.2",
     "googleapis": "^172.0.0",
@@ -34,5 +36,6 @@
     "typescript-eslint": "^8.59.4",
     "vite": "^8.0.14",
     "vitest": "^4.1.7"
-  }
+  },
+  "packageManager": "pnpm@11.2.2+sha512.36e6621fad506178936455e70247b8808ef4ec25797a9f437a93281a020484e2607f6a469a22e982987c3dbb8866e3071514ab10a4a1749e06edcd1ec118436f"
 }

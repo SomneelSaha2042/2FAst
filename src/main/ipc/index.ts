@@ -8,6 +8,7 @@ import {
 	saveGoogleOAuthConfig,
 } from '../oauth/google-config.js'
 import { cancelActiveOAuthFlow } from '../oauth/oauth-handler.js'
+import { cancelActiveMicrosoftOAuthFlow } from '../oauth/microsoft-auth.js'
 
 const notImplemented = (): IpcResult<never> => ({
 	success: false,
@@ -23,6 +24,34 @@ const formatError = (error: unknown): IpcResult<never> => {
 }
 
 const isProvider = (value: unknown): value is Provider => value === 'gmail' || value === 'outlook'
+
+const isListMessagesOptions = (
+	value: unknown
+): value is {
+	labelId?: string
+	folderId?: string
+	query?: string
+	pageToken?: string
+	maxResults?: number
+} => {
+	if (value === undefined) {
+		return true
+	}
+	if (typeof value !== 'object' || value === null) {
+		return false
+	}
+	const record = value as Record<string, unknown>
+	return (
+		(record.labelId === undefined || typeof record.labelId === 'string') &&
+		(record.folderId === undefined || typeof record.folderId === 'string') &&
+		(record.query === undefined || typeof record.query === 'string') &&
+		(record.pageToken === undefined || typeof record.pageToken === 'string') &&
+		(record.maxResults === undefined ||
+			(typeof record.maxResults === 'number' &&
+				Number.isInteger(record.maxResults) &&
+				record.maxResults > 0))
+	)
+}
 
 const isGoogleOAuthConfigInput = (
 	value: unknown
@@ -102,10 +131,12 @@ const registerIpcHandlers = (): void => {
 		'oauth:cancelFlow',
 		async (): Promise<IpcResult<{ canceled: boolean }>> => {
 			try {
+				const canceledGoogle = await cancelActiveOAuthFlow()
+				const canceledMicrosoft = await cancelActiveMicrosoftOAuthFlow()
 				return {
 					success: true,
 					data: {
-						canceled: await cancelActiveOAuthFlow(),
+						canceled: canceledGoogle || canceledMicrosoft,
 					},
 				}
 			} catch (error) {
@@ -155,12 +186,96 @@ const registerIpcHandlers = (): void => {
 		}
 	)
 
-	const unimplementedChannels: readonly (keyof IpcApi)[] = [
+	ipcMain.handle(
 		'mail:listMessages',
+		async (_event, accountId: unknown, options: unknown): Promise<IpcResult<unknown>> => {
+			try {
+				if (typeof accountId !== 'string' || accountId.length === 0) {
+					throw new Error('Invalid accountId for mail:listMessages')
+				}
+				if (!isListMessagesOptions(options)) {
+					throw new Error('Invalid options for mail:listMessages')
+				}
+				const provider = await accountManager.getProvider(accountId)
+				const data = await provider.listMessages(options)
+				return { success: true, data }
+			} catch (error) {
+				return formatError(error)
+			}
+		}
+	)
+
+	ipcMain.handle(
 		'mail:getMessage',
+		async (_event, accountId: unknown, messageId: unknown): Promise<IpcResult<unknown>> => {
+			try {
+				if (typeof accountId !== 'string' || accountId.length === 0) {
+					throw new Error('Invalid accountId for mail:getMessage')
+				}
+				if (typeof messageId !== 'string' || messageId.length === 0) {
+					throw new Error('Invalid messageId for mail:getMessage')
+				}
+				const provider = await accountManager.getProvider(accountId)
+				const data = await provider.getMessage(messageId)
+				return { success: true, data }
+			} catch (error) {
+				return formatError(error)
+			}
+		}
+	)
+
+	ipcMain.handle(
 		'mail:getThread',
+		async (_event, accountId: unknown, threadId: unknown): Promise<IpcResult<unknown>> => {
+			try {
+				if (typeof accountId !== 'string' || accountId.length === 0) {
+					throw new Error('Invalid accountId for mail:getThread')
+				}
+				if (typeof threadId !== 'string' || threadId.length === 0) {
+					throw new Error('Invalid threadId for mail:getThread')
+				}
+				const provider = await accountManager.getProvider(accountId)
+				const data = await provider.getThread(threadId)
+				return { success: true, data }
+			} catch (error) {
+				return formatError(error)
+			}
+		}
+	)
+
+	ipcMain.handle(
 		'mail:listLabels',
+		async (_event, accountId: unknown): Promise<IpcResult<unknown>> => {
+			try {
+				if (typeof accountId !== 'string' || accountId.length === 0) {
+					throw new Error('Invalid accountId for mail:listLabels')
+				}
+				const provider = await accountManager.getProvider(accountId)
+				const data = await provider.listLabels()
+				return { success: true, data }
+			} catch (error) {
+				return formatError(error)
+			}
+		}
+	)
+
+	ipcMain.handle(
 		'mail:listFolders',
+		async (_event, accountId: unknown): Promise<IpcResult<unknown>> => {
+			try {
+				if (typeof accountId !== 'string' || accountId.length === 0) {
+					throw new Error('Invalid accountId for mail:listFolders')
+				}
+				const provider = await accountManager.getProvider(accountId)
+				const data = await provider.listFolders()
+				return { success: true, data }
+			} catch (error) {
+				return formatError(error)
+			}
+		}
+	)
+
+	const unimplementedChannels: readonly (keyof IpcApi)[] = [
 		'mail:sendMessage',
 		'mail:replyToMessage',
 		'mail:trashMessage',

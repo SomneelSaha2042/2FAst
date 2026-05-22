@@ -57,3 +57,31 @@ export const deleteTokens = async (accountId: string): Promise<void> => {
 		rmSync(filePath, { force: true })
 	}
 }
+
+/**
+ * Saves encrypted raw token cache text for an account.
+ * @param accountId Internal account identifier.
+ * @param cache Serialized cache payload to encrypt and persist.
+ * @returns Promise that resolves when write completes.
+ */
+export const saveTokenCacheByKey = async (accountId: string, cache: string): Promise<void> => {
+	ensureSafeStorageAvailable()
+	mkdirSync(TOKENS_DIR, { recursive: true })
+	const encrypted = safeStorage.encryptString(cache)
+	writeFileSync(tokenFilePath(accountId), encrypted)
+}
+
+/**
+ * Loads encrypted raw token cache text for an account.
+ * @param accountId Internal account identifier.
+ * @returns Decrypted cache payload, or null if no cache exists.
+ */
+export const loadTokenCacheByKey = async (accountId: string): Promise<string | null> => {
+	ensureSafeStorageAvailable()
+	const filePath = tokenFilePath(accountId)
+	if (!existsSync(filePath)) {
+		return null
+	}
+	const encrypted = readFileSync(filePath)
+	return safeStorage.decryptString(encrypted)
+}
