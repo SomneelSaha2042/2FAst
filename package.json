@@ -1,0 +1,35 @@
+{
+  "name": "2fast",
+  "private": true,
+  "type": "module",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev": "tsc -p src/main/tsconfig.json && tsc -p src/preload/tsconfig.json && concurrently \"vite --config vite.config.ts\" \"tsc -p src/main/tsconfig.json --watch\" \"tsc -p src/preload/tsconfig.json --watch\" \"set VITE_DEV_SERVER_URL=http://localhost:5173&& electron .\"",
+    "build": "vite build --config vite.config.ts && tsc -p src/main/tsconfig.json && tsc -p src/preload/tsconfig.json",
+    "verify": "tsc --noEmit -p src/main/tsconfig.json && tsc --noEmit -p src/preload/tsconfig.json && tsc --noEmit -p src/renderer/tsconfig.json && eslint . && vitest run",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "electron": "^42.2.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "concurrently": "^9.2.1",
+    "electron-builder": "^26.8.1",
+    "eslint": "^10.4.0",
+    "prettier": "^3.8.3",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.4",
+    "vite": "^8.0.14",
+    "vitest": "^4.1.7"
+  }
+}
