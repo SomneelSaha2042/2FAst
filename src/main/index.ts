@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import './ipc/index.js'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 
