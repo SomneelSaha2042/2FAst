@@ -1,14 +1,14 @@
-# PRD — 2Fast Electron + TS
-
 ## §1 — Problem statement
 
-Existing email clients are either slow, bloated, or locked to a single provider. **2Fast** is a fast, lightweight, multi-account desktop email client built with Electron + TypeScript that unifies Gmail and Outlook inboxes into one native-feeling app.
+Every day you log in to services that send OTP/verification codes to your email. You have to switch to your browser, find the email, copy the code, and switch back. With multiple email accounts across Gmail and Outlook, this friction multiplies.
+
+**2Fast** is a lightweight desktop OTP retrieval utility built with Electron + TypeScript. It lets you trigger OTP checks on demand per connected Gmail or Outlook account, detects incoming OTP/verification codes, auto-copies them to your clipboard, and notifies you — all from a minimal desktop utility UI.
 
 ## §2 — Target users
 
-- Power users managing 2–5+ email accounts across Google and Microsoft
-- Developers and knowledge workers who want keyboard-driven, snappy email
-- Privacy-conscious users who prefer a local-first desktop app over browser tabs
+- Developers and power users who receive frequent OTPs across multiple email accounts
+- Anyone managing 2+ email accounts (Gmail / Outlook) who wants instant OTP access
+- Security-conscious users who prefer a local desktop tool over browser extensions
 
 ## §3 — Core functionality (v0.1)
 
@@ -16,14 +16,14 @@ Existing email clients are either slow, bloated, or locked to a single provider.
 | --- | --- | --- | --- |
 | **OAuth login** | ✅ | ✅ | PKCE + loopback redirect for both |
 | **Multi-account** | ✅ N accounts | ✅ N accounts | Isolated token storage per account |
-| **List messages** | ✅ | ✅ | Threaded view, pagination |
-| **Read message** | ✅ | ✅ | HTML body rendering (sandboxed) |
-| **Send / reply / forward** | ✅ | ✅ | Plain text + HTML compose |
-| **Labels / folders** | ✅ labels | ✅ folders | Unified abstraction layer |
-| **Search** | ✅ | ✅ | Provider-native search pass-through |
-| **Draft management** | ✅ | ✅ | Create, update, send, delete drafts |
-| **Attachments** | ✅ | ✅ | Download + upload (send) |
-| **Offline cache** | ✅ | ✅ | SQLite local cache (Phase 7) |
+| **On-demand OTP query** | ✅ | ✅ | User clicks "Check OTP" per account; scans recent unread emails |
+| **OTP extraction** | ✅ | ✅ | Regex engine with confidence scoring, trigger word detection |
+| **Auto-copy to clipboard** | ✅ | ✅ | Instant clipboard write on OTP detection |
+| **System notifications** | ✅ | ✅ | Native OS notification with OTP code + sender |
+| **System tray** | ✅ | ✅ | Optional quick access, recent OTPs in context menu |
+| **Compact OTP feed** | ✅ | ✅ | Small popover window with OTP cards + history |
+| **OTP expiry** | ✅ | ✅ | Auto-expire after configurable TTL (default 10min) |
+| **Launch on startup** | ✅ | ✅ | Optional; starts lightweight with no background polling loop |
 
 ## §4 — Feasibility verdict
 
@@ -259,24 +259,23 @@ Base URL: `https://graph.microsoft.com/v1.0`
 
 ## §12 — Phase overview
 
-| # | Phase | Delivers |
-| --- | --- | --- |
-| 1 | Scaffold | Repo, build pipeline, dev server, `pnpm verify` passes |
-| 2 | IPC & shared types | Typed IPC bridge, shared models, preload sandbox |
-| 3 | Google OAuth (single account) | BYOC setup, loopback OAuth, token encryption, account stored |
-| 4 | Gmail message list | GmailProvider, message list UI, read message, labels sidebar |
-| 5 | Microsoft OAuth + Outlook list | MSAL auth, OutlookProvider, unified message list, folders |
-| 6 | Multi-account UX | AccountManager, account switcher sidebar, add/remove accounts |
-| 7 | SQLite cache + delta sync | Local cache, background sync, offline reading, incremental updates |
-| 8 | Send / reply + polish | Compose window, reply/forward, drafts, attachments, search |
-| 9 | Pre-launch | Packaging, auto-update, CI, README, license |
+| # | Phase | Delivers | Status |
+| --- | --- | --- | --- |
+| 1 | Scaffold | Repo, build pipeline, dev server, `pnpm verify` passes | ✅ Done |
+| 2 | IPC & shared types | Typed IPC bridge, shared models, preload sandbox | ✅ Done |
+| 3 | Google OAuth (single account) | BYOC setup, loopback OAuth, token encryption, account stored | ✅ Done |
+| 4 | Gmail message list | GmailProvider, message list UI, read message, labels sidebar | ✅ Done |
+| 5 | Microsoft OAuth + Outlook list | MSAL auth, OutlookProvider, unified message list, folders | ✅ Done |
+| 6 | Multi-account UX | AccountManager, account switcher sidebar, add/remove accounts | ✅ Done |
+| 7 | OTP Query & Extraction Engine | Manual per-account OTP query, regex OTP extraction, clipboard + notifications, OTP feed UI | 🔴 Next |
+| 8 | Tray UI, Polish & Packaging | System tray, compact popover, settings, electron-builder, CI, README | 🔴 Pending |
 
 ## §13 — Risk register
 
 | Risk | Impact | Likelihood | Mitigation |
 | --- | --- | --- | --- |
 | Google app verification cost ($15k–$75k) | High | Certain (if distributing) | **BYOC** — each user brings their own OAuth client |
-| `better-sqlite3` native build fails on some platforms | Medium | Low | Use `prebuild-install`; fallback to `sql.js` (WASM) |
-| Gmail API rate limits (250 quota units/user/sec) | Medium | Low | Batch requests, exponential backoff, local cache |
-| Microsoft Graph throttling (10,000 req/10min/app) | Medium | Low | Delta sync, local cache, retry-after headers |
-| Electron security vulns (XSS in rendered HTML email) | High | Medium | Sandboxed `<webview>` or `<iframe sandbox>` for HTML emails |
+| Gmail API rate limits (250 quota units/user/sec) | Medium | Low | User-triggered queries, short lookback window (last 5min), max 20 emails/query, exponential backoff |
+| Microsoft Graph throttling (10,000 req/10min/app) | Medium | Low | Filtered queries (unread + recent only), retry-after headers |
+| OTP false positives (order numbers, promo codes) | Low | Medium | Confidence scoring, trigger word proximity, body length filter, sender allowlist |
+| OTP format diversity (new patterns) | Low | Medium | Pluggable pattern engine, configurable regex list |
