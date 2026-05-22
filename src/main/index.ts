@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import './ipc/index.js'
+import { loadGoogleOAuthConfig } from './oauth/google-config.js'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 
@@ -27,6 +28,16 @@ const createMainWindow = (): void => {
 }
 
 app.whenReady().then(() => {
+  process.on('uncaughtException', (error: Error) => {
+    // Safety net to avoid main-process crash on unexpected exceptions.
+    console.error('Uncaught exception in main process:', error.message)
+  })
+
+  void loadGoogleOAuthConfig().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : 'Unknown Google config error'
+    console.error('Failed to validate Google OAuth config at startup:', message)
+  })
+
   createMainWindow()
 
   app.on('activate', () => {

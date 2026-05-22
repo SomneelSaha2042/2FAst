@@ -30,7 +30,20 @@ export interface DraftMessage {
 	attachments?: File[]
 }
 
+export interface GoogleOAuthConfigInput {
+	readonly clientId: string
+	readonly clientSecret: string
+	readonly projectId?: string
+}
+
 export interface IpcApi {
+	'oauth:getGoogleConfigStatus': () => Promise<IpcResult<{ configured: boolean }>>
+	'oauth:saveGoogleConfig': (
+		config: GoogleOAuthConfigInput
+	) => Promise<IpcResult<{ path: string }>>
+	'oauth:deleteGoogleConfig': () => Promise<IpcResult<{ deleted: boolean }>>
+	'oauth:cancelFlow': () => Promise<IpcResult<{ canceled: boolean }>>
+
 	'accounts:list': () => Promise<IpcResult<Account[]>>
 	'accounts:add': (provider: Provider) => Promise<IpcResult<Account>>
 	'accounts:remove': (accountId: string) => Promise<IpcResult<void>>
@@ -72,6 +85,10 @@ export interface IpcApi {
 }
 
 export const IPC_CHANNELS = [
+	'oauth:getGoogleConfigStatus',
+	'oauth:saveGoogleConfig',
+	'oauth:deleteGoogleConfig',
+	'oauth:cancelFlow',
 	'accounts:list',
 	'accounts:add',
 	'accounts:remove',

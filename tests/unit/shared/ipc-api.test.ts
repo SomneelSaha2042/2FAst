@@ -4,6 +4,10 @@ import { IPC_CHANNELS } from '../../../src/shared/ipc-api'
 describe('IPC channel list', () => {
   it('matches expected channel names', () => {
     const expected = [
+      'oauth:getGoogleConfigStatus',
+      'oauth:saveGoogleConfig',
+      'oauth:deleteGoogleConfig',
+      'oauth:cancelFlow',
       'accounts:list',
       'accounts:add',
       'accounts:remove',

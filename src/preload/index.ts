@@ -2,6 +2,10 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcApi } from '../shared/ipc-api'
 
 const api: { [K in keyof IpcApi]: IpcApi[K] } = {
+	'oauth:getGoogleConfigStatus': () => ipcRenderer.invoke('oauth:getGoogleConfigStatus'),
+	'oauth:saveGoogleConfig': (config) => ipcRenderer.invoke('oauth:saveGoogleConfig', config),
+	'oauth:deleteGoogleConfig': () => ipcRenderer.invoke('oauth:deleteGoogleConfig'),
+	'oauth:cancelFlow': () => ipcRenderer.invoke('oauth:cancelFlow'),
 	'accounts:list': () => ipcRenderer.invoke('accounts:list'),
 	'accounts:add': (provider) => ipcRenderer.invoke('accounts:add', provider),
 	'accounts:remove': (accountId) => ipcRenderer.invoke('accounts:remove', accountId),
