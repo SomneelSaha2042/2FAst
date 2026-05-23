@@ -5,6 +5,8 @@ export interface ListMessagesOptions {
 	readonly labelId?: string
 	readonly folderId?: string
 	readonly query?: string
+	readonly searchText?: string
+	readonly receivedAfter?: string
 	readonly pageToken?: string
 	readonly maxResults?: number
 }

@@ -21,13 +21,7 @@ vi.mock('@microsoft/microsoft-graph-client', () => ({
 describe('outlook provider', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
-		selectMock.mockReturnValue({ orderby: orderbyMock })
-		orderbyMock.mockReturnValue({ top: topMock })
-		topMock.mockReturnValue({ skip: skipMock, get: getMock })
-		skipMock.mockReturnValue({ search: searchMock, get: getMock })
-		searchMock.mockReturnValue({ get: getMock })
-		filterMock.mockReturnValue({ orderby: orderbyMock, get: getMock })
-		apiFactory.api.mockReturnValue({
+		const requestMock = {
 			select: selectMock,
 			orderby: orderbyMock,
 			top: topMock,
@@ -35,7 +29,14 @@ describe('outlook provider', () => {
 			search: searchMock,
 			filter: filterMock,
 			get: getMock,
-		})
+		}
+		selectMock.mockReturnValue(requestMock)
+		orderbyMock.mockReturnValue(requestMock)
+		topMock.mockReturnValue(requestMock)
+		skipMock.mockReturnValue(requestMock)
+		searchMock.mockReturnValue(requestMock)
+		filterMock.mockReturnValue(requestMock)
+		apiFactory.api.mockReturnValue(requestMock)
 	})
 
 	it('maps listMessages payload into shared message shape', async () => {
@@ -71,6 +72,38 @@ describe('outlook provider', () => {
 			isStarred: true,
 			threadId: 'c1',
 		})
+	})
+
+	it('uses Graph filter and skip for received-after polling', async () => {
+		getMock.mockResolvedValue({ value: [] })
+
+		const { OutlookProvider } = await import('../../../../src/main/providers/outlook')
+		const provider = new OutlookProvider('account-1', 'token')
+		await provider.listMessages({
+			receivedAfter: '2026-05-23T01:00:00.000Z',
+			pageToken: '20',
+			maxResults: 5,
+		})
+
+		expect(filterMock).toHaveBeenCalledWith('receivedDateTime ge 2026-05-23T01:00:00.000Z')
+		expect(skipMock).toHaveBeenCalledWith(20)
+		expect(searchMock).not.toHaveBeenCalled()
+	})
+
+	it('does not combine Graph search with skip', async () => {
+		getMock.mockResolvedValue({ value: [] })
+
+		const { OutlookProvider } = await import('../../../../src/main/providers/outlook')
+		const provider = new OutlookProvider('account-1', 'token')
+		await provider.listMessages({
+			searchText: 'security code',
+			pageToken: '20',
+			maxResults: 5,
+		})
+
+		expect(searchMock).toHaveBeenCalledWith('"security code"')
+		expect(skipMock).not.toHaveBeenCalled()
+		expect(filterMock).not.toHaveBeenCalled()
 	})
 
 	it('maps folders from Graph response', async () => {

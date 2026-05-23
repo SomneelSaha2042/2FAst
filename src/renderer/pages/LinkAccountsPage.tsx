@@ -28,7 +28,7 @@ const LinkAccountsPage = ({
   primaryButtonStyle,
 }: LinkAccountsPageProps): ReactElement => {
   return (
-    <section style={{ display: 'grid', gap: 12 }}>
+    <section style={{ display: 'grid', gap: 14 }}>
       <div style={cardStyle}>
         <h2 style={{ marginTop: 0 }}>Link Accounts</h2>
         <p style={{ marginTop: 0, color: '#64748b' }}>
@@ -58,13 +58,14 @@ const LinkAccountsPage = ({
               <div
                 key={account.id}
                 style={{
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 10,
-                  padding: 10,
+                  border: '1px solid #dbeafe',
+                  borderRadius: 12,
+                  padding: 12,
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   gap: 10,
+                  background: '#f8fbff',
                 }}
               >
                 <div>

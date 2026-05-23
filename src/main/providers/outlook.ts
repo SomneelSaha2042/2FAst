@@ -4,6 +4,8 @@ import type { Label, MailFolder, Message, MessageAddress, Thread } from '../../s
 import type { ListMessagesOptions, ListMessagesResult, MailProvider } from './types.js'
 
 const DEFAULT_MAX_RESULTS = 50
+const GRAPH_MESSAGE_SELECT =
+	'id,subject,from,toRecipients,receivedDateTime,bodyPreview,isRead,flag,hasAttachments,conversationId'
 
 interface GraphEmailAddress {
 	readonly name?: string
@@ -89,6 +91,10 @@ const extractNextPageToken = (nextLink?: string): string | undefined => {
 	}
 }
 
+const escapeODataString = (value: string): string => value.replace(/'/g, "''")
+
+const isIsoDate = (value: string): boolean => !Number.isNaN(Date.parse(value))
+
 export class OutlookProvider implements MailProvider {
 	readonly provider = 'outlook' as const
 
@@ -106,16 +112,20 @@ export class OutlookProvider implements MailProvider {
 		const maxResults = options?.maxResults ?? DEFAULT_MAX_RESULTS
 		const skip = Number.parseInt(options?.pageToken ?? '0', 10)
 		const endpoint = options?.folderId ? `/me/mailFolders/${options.folderId}/messages` : '/me/messages'
-		const request = this.getClient()
+		let request = this.getClient()
 			.api(endpoint)
-			.select(
-				'id,subject,from,toRecipients,receivedDateTime,bodyPreview,isRead,flag,hasAttachments,conversationId'
-			)
-			.orderby('receivedDateTime desc')
+			.select(GRAPH_MESSAGE_SELECT)
 			.top(maxResults)
-			.skip(Number.isFinite(skip) ? skip : 0)
-		if (options?.query) {
-			request.search(`"${options.query}"`)
+		const searchText = options?.searchText?.trim()
+		if (searchText) {
+			request = request.search(`"${searchText}"`)
+		} else {
+			request = request.orderby('receivedDateTime desc')
+			const filters = this.buildListFilters(options)
+			if (filters.length > 0) {
+				request = request.filter(filters.join(' and '))
+			}
+			request = request.skip(Number.isFinite(skip) ? skip : 0)
 		}
 		const response = (await request.get()) as GraphMessageListResponse
 		const messages = (response.value ?? []).map((message) => mapMessage(this.accountId, message, false))
@@ -123,6 +133,17 @@ export class OutlookProvider implements MailProvider {
 			messages,
 			nextPageToken: extractNextPageToken(response['@odata.nextLink']),
 		}
+	}
+
+	private buildListFilters(options?: ListMessagesOptions): string[] {
+		const filters: string[] = []
+		if (options?.receivedAfter && isIsoDate(options.receivedAfter)) {
+			filters.push(`receivedDateTime ge ${options.receivedAfter}`)
+		}
+		if (options?.query?.trim()) {
+			filters.push(`contains(subject,'${escapeODataString(options.query.trim())}')`)
+		}
+		return filters
 	}
 
 	/**
@@ -235,7 +256,8 @@ export class OutlookProvider implements MailProvider {
 
 	private getClient(): Client {
 		return Client.init({
-			authProvider: (done) => done(null, this.accessToken),
+			authProvider: (done: (error: Error | null, accessToken: string | null) => void) =>
+				done(null, this.accessToken),
 		})
 	}
 }

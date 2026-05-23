@@ -45,13 +45,13 @@ const GmailSetupPage = ({
   primaryButtonStyle,
 }: GmailSetupPageProps): ReactElement => {
   return (
-    <section style={{ display: 'grid', gap: 12 }}>
+    <section style={{ display: 'grid', gap: 14 }}>
       <div style={cardStyle}>
         <h2 style={{ marginTop: 0 }}>Gmail BYOC Setup Guide</h2>
-        <p style={{ color: '#475569' }}>
+        <p style={{ color: '#475569', lineHeight: 1.5 }}>
           Tip: copy each link and open it in a browser profile already logged into the Google account you want to connect.
         </p>
-        <ol style={{ lineHeight: 1.55, marginBottom: 0 }}>
+        <ol style={{ lineHeight: 1.6, marginBottom: 0 }}>
           <li>Log in with the Google account you want to link in 2Fast.</li>
           <li>
             Open Google Cloud Console for that account.{' '}

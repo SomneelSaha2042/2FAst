@@ -169,16 +169,23 @@ export class GmailProvider implements MailProvider {
 	 */
 	async listMessages(options?: ListMessagesOptions): Promise<ListMessagesResult> {
 		const gmail = await this.getClient()
+		const queryParts = [
+			options?.query,
+			options?.searchText,
+			options?.receivedAfter
+				? `after:${Math.floor(new Date(options.receivedAfter).getTime() / 1000)}`
+				: undefined,
+		].filter((part): part is string => Boolean(part && part.trim().length > 0))
 		const response = await gmail.users.messages.list({
 			userId: 'me',
 			labelIds: options?.labelId ? [options.labelId] : undefined,
-			q: options?.query,
+			q: queryParts.length > 0 ? queryParts.join(' ') : undefined,
 			pageToken: options?.pageToken,
 			maxResults: options?.maxResults ?? DEFAULT_MAX_RESULTS,
 		})
 		const ids = response.data.messages ?? []
 		const detailed = await Promise.all(
-			ids.map(async (entry) => {
+			ids.map(async (entry: gmail_v1.Schema$Message) => {
 				const details = await gmail.users.messages.get({
 					userId: 'me',
 					id: entry.id ?? '',
@@ -221,7 +228,7 @@ export class GmailProvider implements MailProvider {
 			id: threadId,
 			format: 'full',
 		})
-		const messages = (response.data.messages ?? []).map((item) =>
+		const messages = (response.data.messages ?? []).map((item: gmail_v1.Schema$Message) =>
 			mapGmailMessage(this.accountId, item, true)
 		)
 		const last = messages[messages.length - 1]
@@ -234,7 +241,7 @@ export class GmailProvider implements MailProvider {
 			messageCount: messages.length,
 			messages,
 			labelIds: last?.labelIds ?? [],
-			isRead: messages.every((message) => message.isRead),
+			isRead: messages.every((message: Message) => message.isRead),
 		}
 	}
 
@@ -247,7 +254,7 @@ export class GmailProvider implements MailProvider {
 		const response = await gmail.users.labels.list({ userId: 'me' })
 		const labels = response.data.labels ?? []
 		const detailed = await Promise.all(
-			labels.map(async (label) => {
+			labels.map(async (label: gmail_v1.Schema$Label) => {
 				if (!label.id || !IMPORTANT_LABELS.has(label.id)) {
 					return label
 				}
@@ -262,10 +269,10 @@ export class GmailProvider implements MailProvider {
 			})
 		)
 		return detailed
-			.filter((label): label is gmail_v1.Schema$Label & { id: string; name: string } =>
+			.filter((label: gmail_v1.Schema$Label): label is gmail_v1.Schema$Label & { id: string; name: string } =>
 				Boolean(label.id && label.name)
 			)
-			.map((label) => ({
+			.map((label: gmail_v1.Schema$Label & { id: string; name: string }) => ({
 				id: label.id,
 				accountId: this.accountId,
 				name: label.name,

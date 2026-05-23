@@ -3,7 +3,9 @@
   "compilerOptions": {
     "rootDir": "..",
     "outDir": "../../dist",
-    "module": "CommonJS"
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "ignoreDeprecations": "6.0"
   },
   "include": ["./**/*", "../shared/**/*"]
 }

@@ -57,8 +57,8 @@ const AccountHubPage = ({
   }
 
   return (
-    <section style={{ display: 'grid', gap: 12 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+    <section style={{ display: 'grid', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
         {accounts.map((account) => {
           const providerColor = getProviderColor(account.provider)
           const otp = otpByAccountId[account.id]
@@ -70,6 +70,7 @@ const AccountHubPage = ({
                 ...cardStyle,
                 borderLeft: `5px solid ${providerColor}`,
                 cursor: isRunning ? 'wait' : 'pointer',
+                transition: 'transform 120ms ease-out, box-shadow 120ms ease-out',
               }}
               onClick={() => {
                 if (!isRunning) {
@@ -83,7 +84,7 @@ const AccountHubPage = ({
                   {account.provider}
                 </span>
               </div>
-              <p style={{ margin: '0 0 10px', color: '#64748b', fontSize: 14 }}>{account.email}</p>
+              <p style={{ margin: '0 0 10px', color: '#64748b', fontSize: 13 }}>{account.email}</p>
               <button
                 type="button"
                 style={primaryButtonStyle}
@@ -101,10 +102,10 @@ const AccountHubPage = ({
                 <div
                   style={{
                     marginTop: 10,
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #bfdbfe',
                     borderRadius: 10,
                     padding: 10,
-                    background: '#f8fafc',
+                    background: 'linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%)',
                   }}
                 >
                   <p style={{ margin: '0 0 5px', fontSize: 12, color: '#475569' }}>Detected OTP</p>

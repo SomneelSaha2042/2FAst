@@ -1,5 +1,6 @@
 node_modules/
 dist/
+release/
 .vscode/
 .DS_Store
 .env
@@ -10,3 +11,4 @@ dist/
 coverage/
 .eslintcache
 *.tsbuildinfo
+.pnpm-store/
