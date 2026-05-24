@@ -9,6 +9,9 @@ interface TokenRefreshErrorShape {
 	readonly error_description?: string
 }
 
+const reconnectRequiredMessage =
+	'Authorization expired or no longer matches the current OAuth credentials. Please reconnect this account from Settings.'
+
 const parseRefreshResponse = (payload: unknown, existing: OAuthTokens): OAuthTokens => {
 	if (typeof payload !== 'object' || payload === null) {
 		throw new Error('Refresh response was not an object')
@@ -69,9 +72,9 @@ export const ensureValidAccessToken = async (
 
 	if (!response.ok) {
 		const errorPayload = (await response.json().catch(() => ({}))) as TokenRefreshErrorShape
-		if (errorPayload.error === 'invalid_grant') {
+		if (errorPayload.error === 'invalid_grant' || response.status === 400 || response.status === 401) {
 			await deleteTokens(accountId)
-			throw new Error('Refresh token is invalid or revoked. Please reconnect your account.')
+			throw new Error(reconnectRequiredMessage)
 		}
 		throw new Error(
 			`Failed to refresh token (${response.status}): ${errorPayload.error_description ?? 'unknown error'}`

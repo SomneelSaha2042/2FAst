@@ -25,6 +25,23 @@ export class OtpStore {
 
 	/** Appends OTP detection to local/persisted history. @param result OTP extraction result. @returns Stored OTP entity. */
 	addOtp(result: OtpResult): StoredOtp {
+		const existing = this.history.find((item) =>
+			item.source.accountId === result.source.accountId &&
+			item.source.messageId === result.source.messageId &&
+			item.code === result.code
+		)
+		if (existing) {
+			const refreshed: StoredOtp = {
+				...existing,
+				...result,
+				detectedAt: new Date().toISOString(),
+				copiedCount: existing.copiedCount + 1,
+				expired: false,
+			}
+			this.history = [refreshed, ...this.history.filter((item) => item.id !== existing.id)].slice(0, MAX_HISTORY)
+			this.persist()
+			return refreshed
+		}
 		const stored: StoredOtp = { ...result, id: randomUUID(), detectedAt: new Date().toISOString(), copiedCount: 1, expired: false }
 		this.history = [stored, ...this.history].slice(0, MAX_HISTORY)
 		this.persist()

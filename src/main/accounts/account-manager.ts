@@ -2,7 +2,7 @@ import Store from 'electron-store'
 import { randomUUID } from 'node:crypto'
 import { google } from 'googleapis'
 import type { Account, Provider } from '../../shared/models.js'
-import { loadGoogleOAuthConfig, type GoogleOAuthConfig } from '../oauth/google-config.js'
+import { loadGoogleOAuthConfig, loadGoogleOAuthConfigByClientId, type GoogleOAuthConfig } from '../oauth/google-config.js'
 import { acquireMicrosoftAccessToken, runMicrosoftOAuthFlow } from '../oauth/microsoft-auth.js'
 import { GmailProvider } from '../providers/gmail.js'
 import { OutlookProvider } from '../providers/outlook.js'
@@ -32,7 +32,8 @@ export class AccountManager {
 		const authConfig: OAuthConfig = { authUrl: GOOGLE_AUTH_URL, tokenUrl: GOOGLE_TOKEN_URL, clientId: oauthConfig.client_id, clientSecret: oauthConfig.client_secret, scopes: GOOGLE_SCOPES }
 		const tokens = await runOAuthFlow(authConfig)
 		const profile = await this.fetchGoogleProfile(oauthConfig, tokens)
-		const account: Account = { id: randomUUID(), provider: 'gmail', email: profile.email, displayName: profile.displayName, avatarUrl: profile.avatarUrl }
+		this.assertGoogleConfigEmailMatches(oauthConfig, profile.email)
+		const account: Account = { id: randomUUID(), provider: 'gmail', email: profile.email, displayName: profile.displayName, avatarUrl: profile.avatarUrl, oauthClientId: oauthConfig.client_id }
 		await saveTokens(account.id, tokens)
 		this.writeAccounts([...this.readAccounts(), account])
 		return account
@@ -41,9 +42,9 @@ export class AccountManager {
 	/** Adds a new Microsoft account by completing OAuth and loading profile. @returns Created account record stored in metadata store. */
 	async addMicrosoftAccount(): Promise<Account> {
 		const accountId = randomUUID()
-		await runMicrosoftOAuthFlow(accountId)
+		const tokens = await runMicrosoftOAuthFlow(accountId)
 		const profile = await this.fetchMicrosoftProfile(accountId)
-		const account: Account = { id: accountId, provider: 'outlook', email: profile.email, displayName: profile.displayName }
+		const account: Account = { id: accountId, provider: 'outlook', email: profile.email, displayName: profile.displayName, oauthAccountId: tokens.homeAccountId }
 		this.writeAccounts([...this.readAccounts(), account])
 		return account
 	}
@@ -67,21 +68,67 @@ export class AccountManager {
 		throw new Error(`Unsupported provider: ${provider}`)
 	}
 
+	/** Reconnects an existing account by replacing only its OAuth token state. @param id Account identifier. @returns Updated account metadata. */
+	async reconnectAccount(id: string): Promise<Account> {
+		const account = this.getAccount(id)
+		if (!account) throw new Error(`Account not found: ${id}`)
+		if (account.provider === 'gmail') return this.reconnectGoogleAccount(account)
+		if (account.provider === 'outlook') return this.reconnectMicrosoftAccount(account)
+		throw new Error(`Unsupported provider: ${account.provider}`)
+	}
+
 	/** Resolves an authenticated provider implementation for an account. @param accountId Internal account identifier. @returns Mail provider bound to account credentials. */
 	async getProvider(accountId: string): Promise<MailProvider> {
 		const account = this.getAccount(accountId)
 		if (!account) throw new Error(`Account not found: ${accountId}`)
-		if (account.provider === 'outlook') return new OutlookProvider(account.id, await acquireMicrosoftAccessToken(account.id))
+		if (account.provider === 'outlook') return new OutlookProvider(account.id, await acquireMicrosoftAccessToken(account.id, account.oauthAccountId))
 		if (account.provider !== 'gmail') throw new Error(`Unsupported provider: ${account.provider}`)
-		const oauthConfig = await this.getGoogleOAuthConfig()
+		const oauthConfig = await this.getGoogleOAuthConfigForAccount(account)
 		return new GmailProvider(account.id, oauthConfig.client_id, oauthConfig.client_secret)
 	}
 
 	private async getGoogleOAuthConfig(): Promise<GoogleOAuthConfig> {
 		const config = await loadGoogleOAuthConfig()
 		if (!config) { this.googleConfig = null; throw new Error('Google OAuth config is missing. Complete BYOC setup first.') }
-		if (!this.googleConfig || this.googleConfig.client_id !== config.client_id || this.googleConfig.client_secret !== config.client_secret || this.googleConfig.project_id !== config.project_id) this.googleConfig = config
+		if (!this.googleConfig || this.googleConfig.email !== config.email || this.googleConfig.client_id !== config.client_id || this.googleConfig.client_secret !== config.client_secret || this.googleConfig.project_id !== config.project_id) this.googleConfig = config
 		return config
+	}
+
+	private async getGoogleOAuthConfigForAccount(account: Account): Promise<GoogleOAuthConfig> {
+		if (!account.oauthClientId) {
+			return this.getGoogleOAuthConfig()
+		}
+		const config = await loadGoogleOAuthConfigByClientId(account.oauthClientId)
+		if (!config) {
+			throw new Error(`Missing BYOC credentials for ${account.email}. Save the OAuth client with client ID ${account.oauthClientId}, then reconnect this account.`)
+		}
+		return config
+	}
+
+	private async reconnectGoogleAccount(account: Account): Promise<Account> {
+		const oauthConfig = await this.getGoogleOAuthConfigForAccount(account)
+		const authConfig: OAuthConfig = { authUrl: GOOGLE_AUTH_URL, tokenUrl: GOOGLE_TOKEN_URL, clientId: oauthConfig.client_id, clientSecret: oauthConfig.client_secret, scopes: GOOGLE_SCOPES }
+		const tokens = await runOAuthFlow(authConfig)
+		const profile = await this.fetchGoogleProfile(oauthConfig, tokens)
+		this.assertGoogleConfigEmailMatches(oauthConfig, profile.email)
+		if (profile.email.toLowerCase() !== account.email.toLowerCase()) {
+			throw new Error(`Authenticated as ${profile.email}, but this account is ${account.email}. Choose the same Google account to reconnect.`)
+		}
+		const updated: Account = { ...account, displayName: profile.displayName, avatarUrl: profile.avatarUrl, oauthClientId: oauthConfig.client_id }
+		await saveTokens(account.id, tokens)
+		this.writeAccounts(this.readAccounts().map((item) => item.id === account.id ? updated : item))
+		return updated
+	}
+
+	private async reconnectMicrosoftAccount(account: Account): Promise<Account> {
+		const tokens = await runMicrosoftOAuthFlow(account.id)
+		const profile = await this.fetchMicrosoftProfile(account.id)
+		if (profile.email.toLowerCase() !== account.email.toLowerCase()) {
+			throw new Error(`Authenticated as ${profile.email}, but this account is ${account.email}. Choose the same Microsoft account to reconnect.`)
+		}
+		const updated: Account = { ...account, displayName: profile.displayName, oauthAccountId: tokens.homeAccountId }
+		this.writeAccounts(this.readAccounts().map((item) => item.id === account.id ? updated : item))
+		return updated
 	}
 
 	private async fetchGoogleProfile(oauthConfig: GoogleOAuthConfig, tokens: OAuthTokens): Promise<{ email: string; displayName: string; avatarUrl?: string }> {
@@ -101,6 +148,12 @@ export class AccountManager {
 		const email = payload.mail ?? payload.userPrincipalName
 		if (!email) throw new Error('Microsoft profile did not include an email address')
 		return { email, displayName: payload.displayName ?? email }
+	}
+
+	private assertGoogleConfigEmailMatches(oauthConfig: GoogleOAuthConfig, profileEmail: string): void {
+		if (oauthConfig.email.toLowerCase() !== profileEmail.toLowerCase()) {
+			throw new Error(`BYOC credentials are labeled for ${oauthConfig.email}, but Google authenticated ${profileEmail}. Save the matching Gmail email or choose the matching Google account.`)
+		}
 	}
 }
 

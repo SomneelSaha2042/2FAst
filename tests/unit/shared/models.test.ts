@@ -20,6 +20,7 @@ describe('shared models', () => {
       email: 'user@example.com',
       displayName: 'Test User',
       avatarUrl: 'https://example.com/avatar.png',
+      oauthClientId: 'client-id.apps.googleusercontent.com',
     }
 
     const address: MessageAddress = {

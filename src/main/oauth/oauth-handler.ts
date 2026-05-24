@@ -202,7 +202,7 @@ const buildAuthUrl = (
 	url.searchParams.set('code_challenge', codeChallenge)
 	url.searchParams.set('code_challenge_method', 'S256')
 	url.searchParams.set('access_type', 'offline')
-	url.searchParams.set('prompt', 'consent')
+	url.searchParams.set('prompt', 'consent select_account')
 	url.searchParams.set('state', state)
 	return url.toString()
 }

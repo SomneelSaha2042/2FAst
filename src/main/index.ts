@@ -11,15 +11,17 @@ import { initAutoUpdater } from './updater.js'
 import { getOtpSettings } from './otp/settings.js'
 import { setAutoLaunch } from './startup.js'
 import { accountManager } from './accounts/account-manager.js'
+import type { Account } from '../shared/models.js'
+import type { PollStartPayload } from '../shared/ipc-api.js'
 
 interface WindowState {
-	x: number
-	y: number
-	width: number
-	height: number
+	readonly x: number
+	readonly y: number
+	readonly width: number
+	readonly height: number
 }
 interface WindowStoreShape {
-	windowState: WindowState
+	readonly settingsWindowState: WindowState
 }
 interface StoreApi<T> {
 	get: <K extends keyof T>(key: K) => T[K]
@@ -27,45 +29,85 @@ interface StoreApi<T> {
 }
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
-const windowStore = new Store<WindowStoreShape>({ name: 'window-state', defaults: { windowState: { x: 120, y: 120, width: 360, height: 480 } } })
+const windowStore = new Store<WindowStoreShape>({
+	name: 'window-state',
+	defaults: { settingsWindowState: { x: 120, y: 120, width: 840, height: 720 } },
+})
 const windowStoreApi = windowStore as unknown as StoreApi<WindowStoreShape>
 
-let mainWindow: BrowserWindow | null = null
+let settingsWindow: BrowserWindow | null = null
+let pollWindow: BrowserWindow | null = null
 let tray: TrayController | null = null
 let isQuitting = false
-let isPollPaused = false
-let lastPollAt: string | null = null
 
 const otpPollService = new OtpPollService({
 	onOtpDetected: (otp) => {
-		mainWindow?.webContents.send('otp:detected', otp)
+		settingsWindow?.webContents.send('otp:detected', otp)
+		pollWindow?.webContents.send('otp:detected', otp)
 		tray?.onOtpDetected()
 	},
 	onOtpExpired: (otpId) => {
-		mainWindow?.webContents.send('otp:expired', otpId)
+		settingsWindow?.webContents.send('otp:expired', otpId)
+		pollWindow?.webContents.send('otp:expired', otpId)
 		tray?.refreshMenu()
 	},
 	onPollStatus: (status) => {
-		lastPollAt = status.lastPollTime ?? null
-		mainWindow?.webContents.send('poll:status', status)
+		settingsWindow?.webContents.send('poll:status', status)
+		pollWindow?.webContents.send('poll:status', status)
 		tray?.refreshMenu()
 	},
 })
 
 setOtpPollService(otpPollService)
 
-const createMainWindow = (): BrowserWindow => {
-	const state = windowStoreApi.get('windowState')
+const rendererPath = (): string => join(app.getAppPath(), 'dist/renderer/index.html')
+const resourcesPath = (): string => app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
+const appIconPath = (): string => join(resourcesPath(), process.platform === 'win32' ? 'icon.ico' : 'icon.png')
+
+const loadRendererView = async (
+	window: BrowserWindow,
+	view: 'settings' | 'poll',
+	payload?: PollStartPayload
+): Promise<void> => {
+	const devServerUrl = process.env.VITE_DEV_SERVER_URL
+	const params = new URLSearchParams({ view })
+	if (payload) {
+		params.set('accountId', payload.accountId)
+		params.set('email', payload.email)
+		params.set('provider', payload.provider)
+	}
+	if (devServerUrl) {
+		await window.loadURL(`${devServerUrl}?${params.toString()}`)
+		return
+	}
+	await window.loadFile(rendererPath(), { query: Object.fromEntries(params.entries()) })
+}
+
+const rememberSettingsBounds = (window: BrowserWindow): void => {
+	const bounds = window.getBounds()
+	windowStoreApi.set('settingsWindowState', {
+		x: bounds.x,
+		y: bounds.y,
+		width: bounds.width,
+		height: bounds.height,
+	})
+}
+
+const createSettingsWindow = (): BrowserWindow => {
+	const state = windowStoreApi.get('settingsWindowState')
 	const window = new BrowserWindow({
 		x: state.x,
 		y: state.y,
 		width: state.width,
 		height: state.height,
-		minWidth: 360,
-		minHeight: 480,
+		minWidth: 760,
+		minHeight: 620,
 		show: false,
 		frame: false,
+		transparent: true,
+		backgroundColor: '#00000000',
 		titleBarStyle: 'hidden',
+		icon: appIconPath(),
 		webPreferences: {
 			contextIsolation: true,
 			nodeIntegration: false,
@@ -73,44 +115,85 @@ const createMainWindow = (): BrowserWindow => {
 			preload: join(currentDir, '../preload/index.js'),
 		},
 	})
-
 	setMainWindowForIpc(window)
-
 	window.on('close', (event) => {
 		if (!isQuitting) {
 			event.preventDefault()
 			window.hide()
 		}
 	})
-	window.on('blur', () => {
-		if (window.isVisible()) {
-			window.hide()
+	window.on('moved', () => rememberSettingsBounds(window))
+	window.on('resized', () => rememberSettingsBounds(window))
+	window.on('closed', () => {
+		if (settingsWindow === window) {
+			settingsWindow = null
 		}
 	})
-	window.on('moved', () => {
-		const bounds = window.getBounds()
-		windowStoreApi.set('windowState', { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height })
-	})
-	window.on('resized', () => {
-		const bounds = window.getBounds()
-		windowStoreApi.set('windowState', { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height })
-	})
-
-	const devServerUrl = process.env.VITE_DEV_SERVER_URL
-	if (devServerUrl) void window.loadURL(devServerUrl)
-	else void window.loadFile(join(app.getAppPath(), 'dist/renderer/index.html'))
-
 	return window
 }
 
-const toggleMainWindow = (): void => {
-	if (!mainWindow) return
-	if (mainWindow.isVisible()) {
-		mainWindow.hide()
-		return
+const createPollWindow = (): BrowserWindow => {
+	const window = new BrowserWindow({
+		width: 380,
+		height: 520,
+		minWidth: 320,
+		minHeight: 480,
+		resizable: false,
+		show: false,
+		frame: false,
+		transparent: true,
+		backgroundColor: '#00000000',
+		alwaysOnTop: true,
+		skipTaskbar: true,
+		icon: appIconPath(),
+		webPreferences: {
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: true,
+			preload: join(currentDir, '../preload/index.js'),
+		},
+	})
+	setMainWindowForIpc(window)
+	window.on('close', (event) => {
+		if (!isQuitting) {
+			event.preventDefault()
+			window.hide()
+		}
+	})
+	window.on('closed', () => {
+		if (pollWindow === window) {
+			pollWindow = null
+		}
+	})
+	return window
+}
+
+const openSettingsWindow = (): void => {
+	if (!settingsWindow) {
+		settingsWindow = createSettingsWindow()
 	}
-	mainWindow.show()
-	mainWindow.focus()
+	void loadRendererView(settingsWindow, 'settings').then(() => {
+		settingsWindow?.show()
+		settingsWindow?.focus()
+	})
+}
+
+const toPollStartPayload = (account: Account): PollStartPayload => ({
+	accountId: account.id,
+	email: account.email,
+	provider: account.provider,
+})
+
+const openPollWindow = (account: Account): void => {
+	if (!pollWindow) {
+		pollWindow = createPollWindow()
+	}
+	const payload = toPollStartPayload(account)
+	void loadRendererView(pollWindow, 'poll', payload).then(() => {
+		pollWindow?.show()
+		pollWindow?.focus()
+		pollWindow?.webContents.send('poll:startAccount', payload)
+	})
 }
 
 app.whenReady().then(() => {
@@ -124,31 +207,17 @@ app.whenReady().then(() => {
 	})
 
 	Menu.setApplicationMenu(buildAppMenu())
-	mainWindow = createMainWindow()
 
 	tray = new TrayController({
 		getRecentOtps: () => otpPollService.getHistory(),
 		copyOtp: (id) => otpPollService.copyOtp(id),
 		getAccounts: () => accountManager.listAccounts(),
-		getLastPollLabel: () => (lastPollAt ? `${Math.max(1, Math.floor((Date.now() - new Date(lastPollAt).getTime()) / 1000))}s ago` : 'never'),
-		isPaused: () => isPollPaused,
-		onTogglePause: () => {
-			if (isPollPaused) {
-				otpPollService.resume()
-				isPollPaused = false
-			} else {
-				otpPollService.pause()
-				isPollPaused = true
-			}
-		},
-		onOpenSettings: () => {
-			mainWindow?.show(); mainWindow?.focus(); mainWindow?.webContents.send('poll:status', { accountId: 'settings', active: !isPollPaused, lastPollTime: new Date().toISOString() })
-		},
+		onOpenSettings: openSettingsWindow,
+		onPollAccount: openPollWindow,
 		onQuit: () => {
 			isQuitting = true
 			app.quit()
 		},
-		onToggleWindow: toggleMainWindow,
 	})
 
 	const settings = getOtpSettings()
@@ -156,9 +225,7 @@ app.whenReady().then(() => {
 	void initAutoUpdater()
 
 	app.on('activate', () => {
-		if (BrowserWindow.getAllWindows().length === 0) {
-			mainWindow = createMainWindow()
-		}
+		openSettingsWindow()
 	})
 })
 

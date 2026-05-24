@@ -78,4 +78,36 @@ describe('OtpStore', () => {
 		})
 		expect(store.copyOtp(otp.id)).toBe('654321')
 	})
+
+	it('refreshes repeated detections from the same message without duplicating history', () => {
+		const store = new OtpStore(10)
+		const first = store.addOtp({
+			code: '112233',
+			type: 'numeric',
+			confidence: 'high',
+			source: {
+				messageId: 'm3',
+				accountId: 'a3',
+				subject: 'OTP',
+				sender: 'sender@example.com',
+				receivedAt: new Date().toISOString(),
+			},
+		})
+		vi.advanceTimersByTime(5000)
+		const refreshed = store.addOtp({
+			code: '112233',
+			type: 'numeric',
+			confidence: 'high',
+			source: {
+				messageId: 'm3',
+				accountId: 'a3',
+				subject: 'OTP',
+				sender: 'sender@example.com',
+				receivedAt: new Date().toISOString(),
+			},
+		})
+		expect(refreshed.id).toBe(first.id)
+		expect(refreshed.detectedAt).not.toBe(first.detectedAt)
+		expect(store.getRecentOtps()).toHaveLength(1)
+	})
 })

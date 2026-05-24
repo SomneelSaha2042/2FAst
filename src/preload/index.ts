@@ -1,10 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { IpcApi, PollStatus, StoredOtp } from '../shared/ipc-api'
+import type { IpcApi, PollStartPayload, PollStatus, StoredOtp } from '../shared/ipc-api'
 
 interface EventApi {
 	onOtpDetected: (listener: (otp: StoredOtp) => void) => () => void
 	onOtpExpired: (listener: (otpId: string) => void) => () => void
 	onPollStatus: (listener: (status: PollStatus) => void) => () => void
+	onStartAccountPoll: (listener: (payload: PollStartPayload) => void) => () => void
 }
 
 const api: { [K in keyof IpcApi]: IpcApi[K] } = {
@@ -14,6 +15,7 @@ const api: { [K in keyof IpcApi]: IpcApi[K] } = {
 	'oauth:cancelFlow': () => ipcRenderer.invoke('oauth:cancelFlow'),
 	'accounts:list': () => ipcRenderer.invoke('accounts:list'),
 	'accounts:add': (provider) => ipcRenderer.invoke('accounts:add', provider),
+	'accounts:reconnect': (accountId) => ipcRenderer.invoke('accounts:reconnect', accountId),
 	'accounts:remove': (accountId) => ipcRenderer.invoke('accounts:remove', accountId),
 	'mail:listMessages': (accountId, options) => ipcRenderer.invoke('mail:listMessages', accountId, options),
 	'mail:getMessage': (accountId, messageId) => ipcRenderer.invoke('mail:getMessage', accountId, messageId),
@@ -32,6 +34,7 @@ const api: { [K in keyof IpcApi]: IpcApi[K] } = {
 	'poll:resume': () => ipcRenderer.invoke('poll:resume'),
 	'poll:setInterval': (ms) => ipcRenderer.invoke('poll:setInterval', ms),
 	'poll:checkAccount': (accountId) => ipcRenderer.invoke('poll:checkAccount', accountId),
+	'poll:scanAccount': (accountId) => ipcRenderer.invoke('poll:scanAccount', accountId),
 	'settings:get': () => ipcRenderer.invoke('settings:get'),
 	'settings:update': (settings) => ipcRenderer.invoke('settings:update', settings),
 	'window:hide': () => ipcRenderer.invoke('window:hide'),
@@ -53,6 +56,11 @@ const events: EventApi = {
 		const wrapped = (_event: Electron.IpcRendererEvent, status: PollStatus) => listener(status)
 		ipcRenderer.on('poll:status', wrapped)
 		return () => ipcRenderer.removeListener('poll:status', wrapped)
+	},
+	onStartAccountPoll: (listener) => {
+		const wrapped = (_event: Electron.IpcRendererEvent, payload: PollStartPayload) => listener(payload)
+		ipcRenderer.on('poll:startAccount', wrapped)
+		return () => ipcRenderer.removeListener('poll:startAccount', wrapped)
 	},
 }
 

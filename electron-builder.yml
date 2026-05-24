@@ -11,6 +11,15 @@ files:
   - dist/**/*
   - package.json
 
+extraResources:
+  - from: resources
+    to: .
+    filter:
+      - icon.png
+      - icon.ico
+      - icon.icns
+      - tray-icon*.png
+
 publish:
   provider: github
 

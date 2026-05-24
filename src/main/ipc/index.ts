@@ -1,4 +1,4 @@
-import { ipcMain, type BrowserWindow } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import type { IpcApi, IpcResult, OtpSettings } from '../../shared/ipc-api.js'
 import { accountManager } from '../accounts/account-manager.js'
 import type { Account, Provider } from '../../shared/models.js'
@@ -28,10 +28,11 @@ const isListMessagesOptions = (value: unknown): value is { labelId?: string; fol
 	)
 }
 
-const isGoogleOAuthConfigInput = (value: unknown): value is { clientId: string; clientSecret: string; projectId?: string } => {
+const isGoogleOAuthConfigInput = (value: unknown): value is { gmailEmail: string; clientId: string; clientSecret: string; projectId?: string } => {
 	if (typeof value !== 'object' || value === null) return false
 	const record = value as Record<string, unknown>
 	return (
+		typeof record.gmailEmail === 'string' && record.gmailEmail.trim().length > 0 &&
 		typeof record.clientId === 'string' && record.clientId.trim().length > 0 &&
 		typeof record.clientSecret === 'string' && record.clientSecret.trim().length > 0 &&
 		(record.projectId === undefined || typeof record.projectId === 'string')
@@ -66,7 +67,12 @@ const registerIpcHandlers = (): void => {
 	ipcMain.handle('oauth:saveGoogleConfig', async (_event, config: unknown): Promise<IpcResult<{ path: string }>> => {
 		try {
 			if (!isGoogleOAuthConfigInput(config)) throw new Error('Invalid Google OAuth config payload')
-			const result = await saveGoogleOAuthConfig({ client_id: config.clientId.trim(), client_secret: config.clientSecret.trim(), project_id: config.projectId?.trim() || undefined })
+			const result = await saveGoogleOAuthConfig({
+				email: config.gmailEmail.trim().toLowerCase(),
+				client_id: config.clientId.trim(),
+				client_secret: config.clientSecret.trim(),
+				project_id: config.projectId?.trim() || undefined,
+			})
 			return { success: true, data: result }
 		} catch (error) { return formatError(error) }
 	})
@@ -86,6 +92,9 @@ const registerIpcHandlers = (): void => {
 	})
 	ipcMain.handle('accounts:list', async (): Promise<IpcResult<Account[]>> => {
 		try { return { success: true, data: [...accountManager.listAccounts()] } } catch (error) { return formatError(error) }
+	})
+	ipcMain.handle('accounts:reconnect', async (_event, accountId: unknown): Promise<IpcResult<Account>> => {
+		try { if (typeof accountId !== 'string' || accountId.length === 0) throw new Error('Invalid accountId for accounts:reconnect'); return { success: true, data: await accountManager.reconnectAccount(accountId) } } catch (error) { return formatError(error) }
 	})
 	ipcMain.handle('accounts:remove', async (_event, accountId: unknown): Promise<IpcResult<void>> => {
 		try { if (typeof accountId !== 'string' || accountId.length === 0) throw new Error('Invalid accountId for accounts:remove'); await accountManager.removeAccount(accountId); return { success: true } } catch (error) { return formatError(error) }
@@ -148,6 +157,9 @@ const registerIpcHandlers = (): void => {
 	ipcMain.handle('poll:checkAccount', async (_event, accountId: unknown): Promise<IpcResult<void>> => {
 		try { if (!otpPollService) throw new Error('OTP polling service is not initialized'); if (typeof accountId !== 'string' || accountId.length === 0) throw new Error('Invalid accountId for poll:checkAccount'); await otpPollService.pollAccountById(accountId); return { success: true } } catch (error) { return formatError(error) }
 	})
+	ipcMain.handle('poll:scanAccount', async (_event, accountId: unknown): Promise<IpcResult<unknown>> => {
+		try { if (!otpPollService) throw new Error('OTP polling service is not initialized'); if (typeof accountId !== 'string' || accountId.length === 0) throw new Error('Invalid accountId for poll:scanAccount'); return { success: true, data: await otpPollService.scanAccountById(accountId) } } catch (error) { return formatError(error) }
+	})
 
 	ipcMain.handle('settings:get', async (): Promise<IpcResult<OtpSettings>> => {
 		try { return { success: true, data: getOtpSettings() } } catch (error) { return formatError(error) }
@@ -162,11 +174,11 @@ const registerIpcHandlers = (): void => {
 		} catch (error) { return formatError(error) }
 	})
 
-	ipcMain.handle('window:hide', async (): Promise<IpcResult<void>> => {
-		try { mainWindow?.hide(); return { success: true } } catch (error) { return formatError(error) }
+	ipcMain.handle('window:hide', async (event): Promise<IpcResult<void>> => {
+		try { (BrowserWindow.fromWebContents(event.sender) ?? mainWindow)?.hide(); return { success: true } } catch (error) { return formatError(error) }
 	})
-	ipcMain.handle('window:minimize', async (): Promise<IpcResult<void>> => {
-		try { mainWindow?.minimize(); return { success: true } } catch (error) { return formatError(error) }
+	ipcMain.handle('window:minimize', async (event): Promise<IpcResult<void>> => {
+		try { (BrowserWindow.fromWebContents(event.sender) ?? mainWindow)?.minimize(); return { success: true } } catch (error) { return formatError(error) }
 	})
 
 	const unimplementedChannels: readonly (keyof IpcApi)[] = ['mail:sendMessage', 'mail:replyToMessage', 'mail:trashMessage', 'mail:toggleRead', 'mail:toggleStar']

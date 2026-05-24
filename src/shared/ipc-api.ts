@@ -31,6 +31,7 @@ export interface DraftMessage {
 }
 
 export interface GoogleOAuthConfigInput {
+	readonly gmailEmail: string
 	readonly clientId: string
 	readonly clientSecret: string
 	readonly projectId?: string
@@ -64,6 +65,12 @@ export interface PollStatus {
 	readonly lastPollTime?: string
 }
 
+export interface PollStartPayload {
+	readonly accountId: string
+	readonly email: string
+	readonly provider: Provider
+}
+
 export interface OtpSettings {
 	readonly pollIntervalMs: number
 	readonly otpTtlMinutes: number
@@ -83,6 +90,7 @@ export interface IpcApi {
 	'oauth:cancelFlow': () => Promise<IpcResult<{ canceled: boolean }>>
 	'accounts:list': () => Promise<IpcResult<Account[]>>
 	'accounts:add': (provider: Provider) => Promise<IpcResult<Account>>
+	'accounts:reconnect': (accountId: string) => Promise<IpcResult<Account>>
 	'accounts:remove': (accountId: string) => Promise<IpcResult<void>>
 	'mail:listMessages': (
 		accountId: string,
@@ -124,6 +132,7 @@ export interface IpcApi {
 	'poll:resume': () => Promise<IpcResult<void>>
 	'poll:setInterval': (ms: number) => Promise<IpcResult<void>>
 	'poll:checkAccount': (accountId: string) => Promise<IpcResult<void>>
+	'poll:scanAccount': (accountId: string) => Promise<IpcResult<OtpResult[]>>
 	'settings:get': () => Promise<IpcResult<OtpSettings>>
 	'settings:update': (settings: Partial<OtpSettings>) => Promise<IpcResult<OtpSettings>>
 	'window:hide': () => Promise<IpcResult<void>>
@@ -137,6 +146,7 @@ export const IPC_CHANNELS = [
 	'oauth:cancelFlow',
 	'accounts:list',
 	'accounts:add',
+	'accounts:reconnect',
 	'accounts:remove',
 	'mail:listMessages',
 	'mail:getMessage',
@@ -155,6 +165,7 @@ export const IPC_CHANNELS = [
 	'poll:resume',
 	'poll:setInterval',
 	'poll:checkAccount',
+	'poll:scanAccount',
 	'settings:get',
 	'settings:update',
 	'window:hide',

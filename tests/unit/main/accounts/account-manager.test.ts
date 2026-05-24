@@ -6,6 +6,9 @@ const loadGoogleOAuthConfigMock = vi.fn()
 const saveTokensMock = vi.fn()
 const deleteTokensMock = vi.fn()
 const userInfoGetMock = vi.fn()
+const runMicrosoftOAuthFlowMock = vi.fn()
+const acquireMicrosoftAccessTokenMock = vi.fn()
+const outlookProviderConstructorMock = vi.fn()
 
 vi.mock('../../../../src/main/oauth/oauth-handler', () => ({
 	runOAuthFlow: runOAuthFlowMock,
@@ -13,11 +16,28 @@ vi.mock('../../../../src/main/oauth/oauth-handler', () => ({
 
 vi.mock('../../../../src/main/oauth/google-config', () => ({
 	loadGoogleOAuthConfig: loadGoogleOAuthConfigMock,
+	loadGoogleOAuthConfigByClientId: async (clientId: string) => {
+		const config = await loadGoogleOAuthConfigMock()
+		return config.client_id === clientId ? config : null
+	},
+}))
+
+vi.mock('../../../../src/main/oauth/microsoft-auth', () => ({
+	acquireMicrosoftAccessToken: acquireMicrosoftAccessTokenMock,
+	runMicrosoftOAuthFlow: runMicrosoftOAuthFlowMock,
 }))
 
 vi.mock('../../../../src/main/accounts/token-store', () => ({
 	saveTokens: saveTokensMock,
 	deleteTokens: deleteTokensMock,
+}))
+
+vi.mock('../../../../src/main/providers/outlook', () => ({
+	OutlookProvider: class {
+		constructor(accountId: string, accessToken: string) {
+			outlookProviderConstructorMock(accountId, accessToken)
+		}
+	},
 }))
 
 class MockStore<T extends Record<string, unknown>> {
@@ -63,6 +83,7 @@ describe('account manager', () => {
 		vi.resetModules()
 		vi.clearAllMocks()
 		loadGoogleOAuthConfigMock.mockResolvedValue({
+			email: 'user@example.com',
 			client_id: 'client-id',
 			client_secret: 'client-secret',
 		})
@@ -72,6 +93,18 @@ describe('account manager', () => {
 			expiresAt: 12345,
 			scope: 'scope',
 		})
+		runMicrosoftOAuthFlowMock.mockResolvedValue({
+			accessToken: 'ms-access',
+			refreshToken: '',
+			expiresAt: 12345,
+			scope: 'Mail.ReadWrite',
+			homeAccountId: 'ms-home-1',
+		})
+		acquireMicrosoftAccessTokenMock.mockResolvedValue('graph-access')
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+			displayName: 'Outlook User',
+			mail: 'outlook@example.com',
+		}))))
 		userInfoGetMock.mockResolvedValue({
 			data: {
 				email: 'user@example.com',
@@ -92,6 +125,7 @@ describe('account manager', () => {
 		const listedAfterRemove = manager.listAccounts()
 
 		expect(added.email).toBe('user@example.com')
+		expect(added.oauthClientId).toBe('client-id')
 		expect(listedAfterAdd).toHaveLength(1)
 		expect(saveTokensMock).toHaveBeenCalledWith(
 			added.id,
@@ -99,5 +133,77 @@ describe('account manager', () => {
 		)
 		expect(deleteTokensMock).toHaveBeenCalledWith(added.id)
 		expect(listedAfterRemove).toHaveLength(0)
+	})
+
+	it('reconnects an existing gmail account without removing account metadata', async () => {
+		const { AccountManager } = await import('../../../../src/main/accounts/account-manager')
+		const manager = new AccountManager()
+		const added = await manager.addGoogleAccount()
+		runOAuthFlowMock.mockResolvedValueOnce({
+			accessToken: 'fresh-access',
+			refreshToken: 'fresh-refresh',
+			expiresAt: 67890,
+			scope: 'fresh-scope',
+		})
+
+		const reconnected = await manager.reconnectAccount(added.id)
+
+		expect(reconnected.id).toBe(added.id)
+		expect(reconnected.oauthClientId).toBe('client-id')
+		expect(manager.listAccounts()).toHaveLength(1)
+		expect(saveTokensMock).toHaveBeenLastCalledWith(
+			added.id,
+			expect.objectContaining({ accessToken: 'fresh-access', refreshToken: 'fresh-refresh' })
+		)
+		expect(deleteTokensMock).not.toHaveBeenCalled()
+	})
+
+	it('rejects a gmail OAuth result that does not match the BYOC email label', async () => {
+		loadGoogleOAuthConfigMock.mockResolvedValueOnce({
+			email: 'expected@example.com',
+			client_id: 'client-id',
+			client_secret: 'client-secret',
+		})
+		const { AccountManager } = await import('../../../../src/main/accounts/account-manager')
+		const manager = new AccountManager()
+
+		await expect(manager.addGoogleAccount()).rejects.toThrow(
+			'BYOC credentials are labeled for expected@example.com, but Google authenticated user@example.com.'
+		)
+		expect(saveTokensMock).not.toHaveBeenCalled()
+	})
+
+	it('stores the Microsoft home account id and uses it for Outlook provider lookup', async () => {
+		const { AccountManager } = await import('../../../../src/main/accounts/account-manager')
+		const manager = new AccountManager()
+
+		const added = await manager.addMicrosoftAccount()
+		await manager.getProvider(added.id)
+
+		expect(added.provider).toBe('outlook')
+		expect(added.email).toBe('outlook@example.com')
+		expect(added.oauthAccountId).toBe('ms-home-1')
+		expect(acquireMicrosoftAccessTokenMock).toHaveBeenLastCalledWith(added.id, 'ms-home-1')
+		expect(outlookProviderConstructorMock).toHaveBeenCalledWith(added.id, 'graph-access')
+	})
+
+	it('keeps the same Outlook account id when reconnecting and updates home account id', async () => {
+		const { AccountManager } = await import('../../../../src/main/accounts/account-manager')
+		const manager = new AccountManager()
+		const added = await manager.addMicrosoftAccount()
+		runMicrosoftOAuthFlowMock.mockResolvedValueOnce({
+			accessToken: 'fresh-ms-access',
+			refreshToken: '',
+			expiresAt: 67890,
+			scope: 'Mail.ReadWrite',
+			homeAccountId: 'ms-home-2',
+		})
+
+		const reconnected = await manager.reconnectAccount(added.id)
+
+		expect(reconnected.id).toBe(added.id)
+		expect(reconnected.email).toBe('outlook@example.com')
+		expect(reconnected.oauthAccountId).toBe('ms-home-2')
+		expect(manager.listAccounts()).toHaveLength(1)
 	})
 })

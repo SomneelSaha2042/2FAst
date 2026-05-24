@@ -185,11 +185,57 @@ export class OtpPollService {
 		if (!account) {
 			throw new Error(`Account not found: ${accountId}`)
 		}
-		await this.pollAccount(account)
+		await this.pollAccount(account, { includeSeen: true })
 		this.persistSeenIds()
 	}
 
-	private async pollAccount(account: Account): Promise<void> {
+	/**
+	 * Scans the latest configured messages for OTP-like codes without mutating OTP history.
+	 * @param accountId Internal account identifier.
+	 * @returns OTP candidates extracted from the latest message window.
+	 */
+	async scanAccountById(accountId: string): Promise<OtpResult[]> {
+		const account = accountManager.getAccount(accountId)
+		if (!account) {
+			throw new Error(`Account not found: ${accountId}`)
+		}
+		await this.writePollLog(
+			`[${new Date().toISOString()}] scan:start accountId=${account.id} email=${account.email} provider=${account.provider}`
+		)
+		const provider = await accountManager.getProvider(account.id)
+		const listResult = await provider.listMessages({
+			maxResults: this.config.maxEmailsPerPoll,
+		})
+		await this.writePollLog(
+			`[${new Date().toISOString()}] scan:list accountId=${account.id} count=${listResult.messages.length} maxResults=${this.config.maxEmailsPerPoll}`
+		)
+
+		const results: OtpResult[] = []
+		for (const item of listResult.messages) {
+			await this.writePollLog(
+				`[${new Date().toISOString()}] scan:item accountId=${account.id} messageId=${item.id} date=${item.date} from=${item.from.email} subject="${item.subject}"`
+			)
+			const message = await provider.getMessage(item.id)
+			const extracted = extractOtp(message.subject, message.bodyText ?? '', message.bodyHtml ?? '')
+			if (!extracted) {
+				await this.writePollLog(
+					`[${new Date().toISOString()}] scan:no-otp accountId=${account.id} messageId=${message.id}`
+				)
+				continue
+			}
+			const result: OtpResult = {
+				...extracted,
+				source: buildOtpSource(message),
+			}
+			results.push(result)
+			await this.writePollLog(
+				`[${new Date().toISOString()}] scan:otp-candidate accountId=${account.id} messageId=${message.id} code=${result.code} type=${result.type} confidence=${result.confidence}`
+			)
+		}
+		return results
+	}
+
+	private async pollAccount(account: Account, options?: { readonly includeSeen?: boolean }): Promise<void> {
 		await this.writePollLog(
 			`[${new Date().toISOString()}] poll:start accountId=${account.id} email=${account.email} provider=${account.provider}`
 		)
@@ -204,7 +250,7 @@ export class OtpPollService {
 			await this.writePollLog(
 				`[${new Date().toISOString()}] poll:item accountId=${account.id} messageId=${item.id} date=${item.date} from=${item.from.email} subject="${item.subject}"`
 			)
-			if (this.seenIds.has(item.id)) {
+			if (!options?.includeSeen && this.seenIds.has(item.id)) {
 				await this.writePollLog(
 					`[${new Date().toISOString()}] poll:skip-seen accountId=${account.id} messageId=${item.id}`
 				)

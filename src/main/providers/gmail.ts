@@ -2,7 +2,6 @@ import { google } from 'googleapis'
 import type { gmail_v1 } from 'googleapis'
 import type { DraftMessage } from '../../shared/ipc-api.js'
 import type { Attachment, Label, MailFolder, Message, MessageAddress, Thread } from '../../shared/models.js'
-import { loadGoogleOAuthConfig } from '../oauth/google-config.js'
 import type { OAuthConfig } from '../oauth/oauth-handler.js'
 import { ensureValidAccessToken } from '../oauth/token-refresh.js'
 import { loadTokens } from '../accounts/token-store.js'
@@ -344,10 +343,6 @@ export class GmailProvider implements MailProvider {
 	}
 
 	private async getClient(): Promise<gmail_v1.Gmail> {
-		const oauthConfig = await loadGoogleOAuthConfig()
-		if (!oauthConfig) {
-			throw new Error('Google OAuth config is missing. Complete BYOC setup first.')
-		}
 		const tokens = await loadTokens(this.accountId)
 		if (!tokens) {
 			throw new Error('Account is missing OAuth tokens. Reconnect the account.')
@@ -360,8 +355,8 @@ export class GmailProvider implements MailProvider {
 		const refreshConfig: OAuthConfig = {
 			authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
 			tokenUrl: GOOGLE_TOKEN_URL,
-			clientId: oauthConfig.client_id,
-			clientSecret: oauthConfig.client_secret,
+			clientId: this.clientId,
+			clientSecret: this.clientSecret,
 			scopes: [],
 		}
 		const validTokens = await ensureValidAccessToken(this.accountId, refreshConfig, tokens)

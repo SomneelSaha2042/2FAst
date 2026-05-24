@@ -5,6 +5,7 @@ import type { Provider } from '../../shared/models'
 interface AddAccountDialogProps {
   readonly isOpen: boolean
   readonly onClose: () => void
+  readonly onCancelConnection?: () => Promise<void>
   readonly onSelectProvider: (provider: Provider) => Promise<void>
 }
 
@@ -13,7 +14,7 @@ interface AddAccountDialogProps {
  * @param props Dialog properties.
  * @returns Modal element.
  */
-const AddAccountDialog = ({ isOpen, onClose, onSelectProvider }: AddAccountDialogProps): ReactElement | null => {
+const AddAccountDialog = ({ isOpen, onClose, onCancelConnection, onSelectProvider }: AddAccountDialogProps): ReactElement | null => {
   const [isLoading, setIsLoading] = useState<boolean>(false)
 
   if (!isOpen) {
@@ -29,14 +30,22 @@ const AddAccountDialog = ({ isOpen, onClose, onSelectProvider }: AddAccountDialo
     }
   }
 
+  const cancel = async (): Promise<void> => {
+    if (isLoading && onCancelConnection) {
+      await onCancelConnection()
+      return
+    }
+    onClose()
+  }
+
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-xl">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">Add Account</h2>
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur">
+      <div className="w-full max-w-sm rounded-lg border border-slate-700/70 bg-slate-900/95 p-4 shadow-xl">
+        <h2 className="mb-3 text-base font-semibold text-slate-100">Add Account</h2>
         <div className="grid gap-2">
           <button
             type="button"
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+            className="rounded-md border border-sky-400/50 bg-sky-500/15 px-3 py-2 text-sm font-medium text-sky-100 hover:bg-sky-500/25"
             disabled={isLoading}
             onClick={() => void connect('gmail')}
           >
@@ -44,7 +53,7 @@ const AddAccountDialog = ({ isOpen, onClose, onSelectProvider }: AddAccountDialo
           </button>
           <button
             type="button"
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+            className="rounded-md border border-sky-400/50 bg-sky-500/15 px-3 py-2 text-sm font-medium text-sky-100 hover:bg-sky-500/25"
             disabled={isLoading}
             onClick={() => void connect('outlook')}
           >
@@ -53,11 +62,10 @@ const AddAccountDialog = ({ isOpen, onClose, onSelectProvider }: AddAccountDialo
         </div>
         <button
           type="button"
-          className="mt-3 w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
-          onClick={onClose}
-          disabled={isLoading}
+          className="mt-3 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800"
+          onClick={() => void cancel()}
         >
-          Cancel
+          {isLoading ? 'Cancel connection' : 'Cancel'}
         </button>
       </div>
     </div>

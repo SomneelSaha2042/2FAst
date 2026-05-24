@@ -18,6 +18,37 @@ interface ActiveMicrosoftOAuthFlow {
 	readonly cancel: () => void
 }
 
+interface MicrosoftCachedAccount {
+	readonly homeAccountId: string
+	readonly environment: string
+	readonly tenantId: string
+	readonly username: string
+	readonly localAccountId: string
+}
+
+export interface MicrosoftOAuthResult extends OAuthTokens {
+	readonly homeAccountId: string
+}
+
+const isMicrosoftCachedAccount = (value: unknown): value is MicrosoftCachedAccount => {
+	if (typeof value !== 'object' || value === null) {
+		return false
+	}
+	const record = value as Record<string, unknown>
+	return (
+		typeof record.homeAccountId === 'string' &&
+		record.homeAccountId.length > 0 &&
+		typeof record.environment === 'string' &&
+		record.environment.length > 0 &&
+		typeof record.tenantId === 'string' &&
+		record.tenantId.length > 0 &&
+		typeof record.username === 'string' &&
+		record.username.length > 0 &&
+		typeof record.localAccountId === 'string' &&
+		record.localAccountId.length > 0
+	)
+}
+
 const toBase64Url = (value: Buffer): string =>
 	value
 		.toString('base64')
@@ -176,9 +207,9 @@ const createPca = (accountId: string): PublicClientApplication => {
 /**
  * Runs Microsoft OAuth via MSAL public-client auth-code flow with PKCE.
  * @param accountId Account id used as the cache key for token persistence.
- * @returns OAuth token bundle mapped to the shared token shape.
+ * @returns OAuth token bundle plus the stable Microsoft home account id.
  */
-export const runMicrosoftOAuthFlow = async (accountId: string): Promise<OAuthTokens> => {
+export const runMicrosoftOAuthFlow = async (accountId: string): Promise<MicrosoftOAuthResult> => {
 	if (!MICROSOFT_CONFIG.clientId || MICROSOFT_CONFIG.clientId.startsWith('<')) {
 		throw new Error('Microsoft OAuth client ID is not configured in microsoft-config.ts')
 	}
@@ -206,25 +237,33 @@ export const runMicrosoftOAuthFlow = async (accountId: string): Promise<OAuthTok
 	if (!result?.accessToken || !result.expiresOn) {
 		throw new Error('Microsoft token exchange returned an invalid response')
 	}
+	if (!result.account?.homeAccountId) {
+		throw new Error('Microsoft token exchange did not include an account identifier')
+	}
 	return {
 		accessToken: result.accessToken,
 		refreshToken: '',
 		expiresAt: Math.floor(result.expiresOn.getTime() / 1000),
 		scope: (result.scopes ?? MICROSOFT_CONFIG.scopes).join(' '),
+		homeAccountId: result.account.homeAccountId,
 	}
 }
 
 /**
  * Gets a Microsoft Graph access token for an account using cached MSAL state.
  * @param accountId Account id used as the cache key.
+ * @param homeAccountId Optional stable Microsoft account id to select from cache.
  * @returns Access token resolved silently from cache/refresh token.
  */
-export const acquireMicrosoftAccessToken = async (accountId: string): Promise<string> => {
+export const acquireMicrosoftAccessToken = async (accountId: string, homeAccountId?: string): Promise<string> => {
 	const pca = createPca(accountId)
-	const accounts = await pca.getTokenCache().getAllAccounts()
-	const account = accounts[0]
+	const rawAccounts = (await pca.getTokenCache().getAllAccounts()) as unknown[]
+	const accounts: MicrosoftCachedAccount[] = rawAccounts.filter(isMicrosoftCachedAccount)
+	const account = homeAccountId
+		? accounts.find((item) => item.homeAccountId === homeAccountId)
+		: accounts[0]
 	if (!account) {
-		throw new Error('Microsoft account cache is empty. Reconnect the account.')
+		throw new Error(homeAccountId ? 'Microsoft account cache is missing the expected account. Reconnect the account.' : 'Microsoft account cache is empty. Reconnect the account.')
 	}
 	const result = await pca.acquireTokenSilent({
 		account,

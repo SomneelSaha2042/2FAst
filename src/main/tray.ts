@@ -1,20 +1,84 @@
-import { Menu, Notification, Tray, clipboard, nativeImage } from 'electron'
+import { Menu, Notification, Tray, clipboard, nativeImage, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
 import { app } from 'electron'
 import type { Account } from '../shared/models.js'
 import type { StoredOtp } from './otp/otp-store.js'
 
-interface TrayContext {
+export interface TrayContext {
 	readonly getRecentOtps: () => StoredOtp[]
 	readonly copyOtp: (id: string) => string | null
 	readonly getAccounts: () => readonly Account[]
-	readonly getLastPollLabel: () => string
-	readonly isPaused: () => boolean
-	readonly onTogglePause: () => void
 	readonly onOpenSettings: () => void
+	readonly onPollAccount: (account: Account) => void
 	readonly onQuit: () => void
-	readonly onToggleWindow: () => void
 }
+
+const copyOtpFromMenu = (otp: StoredOtp, context: TrayContext): void => {
+	const code = context.copyOtp(otp.id)
+	if (!code) {
+		return
+	}
+	clipboard.writeText(code)
+	new Notification({ title: 'OTP copied', body: `${code} copied to clipboard.` }).show()
+}
+
+const accountItems = (
+	accounts: readonly Account[],
+	provider: 'gmail' | 'outlook',
+	context: TrayContext
+): MenuItemConstructorOptions[] => {
+	const providerAccounts = accounts.filter((account) => account.provider === provider)
+	const title = provider === 'gmail' ? 'Gmail' : 'Outlook'
+	if (providerAccounts.length === 0) {
+		return [
+			{ label: title, enabled: false },
+			{ label: 'No accounts connected', enabled: false },
+		]
+	}
+	return [
+		{ label: title, enabled: false },
+		...providerAccounts.map((account) => ({
+			label: account.email,
+			click: () => context.onPollAccount(account),
+		})),
+	]
+}
+
+/**
+ * Builds the tray context menu template from current app state.
+ * @param context Tray actions and state readers.
+ * @returns Electron menu template.
+ */
+export function buildTrayMenuTemplate(context: TrayContext): MenuItemConstructorOptions[] {
+	const otps = context.getRecentOtps().slice(0, 5)
+	const accounts = context.getAccounts()
+	return [
+		{ label: '2Fast', enabled: false },
+		{ type: 'separator' },
+		...accountItems(accounts, 'gmail', context),
+		{ type: 'separator' },
+		...accountItems(accounts, 'outlook', context),
+		{ type: 'separator' },
+		{ label: 'Recent OTPs', enabled: false },
+		...otps.map((otp) => ({
+			label: `${otp.code} (${otp.source.sender} - ${relativeTime(otp.detectedAt)})`,
+			click: () => copyOtpFromMenu(otp, context),
+		})),
+		...(otps.length === 0 ? [{ label: 'No recent OTPs', enabled: false }] : []),
+		{ type: 'separator' },
+		{ label: 'Settings...', click: () => context.onOpenSettings() },
+		{ type: 'separator' },
+		{ label: 'Quit 2Fast', click: () => context.onQuit() },
+	]
+}
+
+const relativeTime = (iso: string): string => {
+	const deltaMs = Date.now() - new Date(iso).getTime()
+	const minutes = Math.max(1, Math.floor(deltaMs / 60_000))
+	return `${minutes}m ago`
+}
+
+const resourcesPath = (): string => app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
 
 export class TrayController {
 	private readonly tray: Tray
@@ -25,11 +89,14 @@ export class TrayController {
 
 	constructor(context: TrayContext) {
 		this.context = context
-		this.normalIcon = this.loadIcon('tray-icon.png')
-		this.activeIcon = this.loadIcon('tray-icon-active.png')
+		this.normalIcon = this.loadIcon(process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'tray-icon.png')
+		this.activeIcon = this.loadIcon(process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'tray-icon-active.png')
 		this.tray = new Tray(this.normalIcon)
-		this.tray.setToolTip('2Fast - OTP Monitor')
-		this.tray.on('click', () => this.context.onToggleWindow())
+		this.tray.setToolTip('2Fast')
+		this.tray.on('click', () => {
+			this.refreshMenu()
+			this.tray.popUpContextMenu()
+		})
 		this.refreshMenu()
 	}
 
@@ -46,52 +113,15 @@ export class TrayController {
 	}
 
 	refreshMenu(): void {
-		const otps = this.context.getRecentOtps().slice(0, 5)
-		const accounts = this.context.getAccounts()
-		const gmailCount = accounts.filter((account) => account.provider === 'gmail').length
-		const outlookCount = accounts.filter((account) => account.provider === 'outlook').length
-		const menu = Menu.buildFromTemplate([
-			{ label: '2Fast - OTP Monitor', enabled: false },
-			{ type: 'separator' },
-			...otps.map((otp) => ({
-				label: `* ${otp.code} (${otp.source.sender} - ${this.relativeTime(otp.detectedAt)})`,
-				click: () => {
-					const code = this.context.copyOtp(otp.id)
-					if (!code) {
-						return
-					}
-					clipboard.writeText(code)
-					new Notification({ title: 'OTP copied', body: `${code} copied to clipboard.` }).show()
-					this.refreshMenu()
-				},
-			})),
-			...(otps.length === 0 ? [{ label: 'No recent OTPs', enabled: false }] : []),
-			{ type: 'separator' },
-			{ label: `Accounts: ${gmailCount} Gmail, ${outlookCount} Outlook`, enabled: false },
-			{ label: `Last poll: ${this.context.getLastPollLabel()}`, enabled: false },
-			{ type: 'separator' },
-			{
-				label: this.context.isPaused() ? 'Resume polling' : 'Pause polling',
-				click: () => {
-					this.context.onTogglePause()
-					this.refreshMenu()
-				},
-			},
-			{ label: 'Settings...', click: () => this.context.onOpenSettings() },
-			{ type: 'separator' },
-			{ label: 'Quit 2Fast', click: () => this.context.onQuit() },
-		])
+		const menu = Menu.buildFromTemplate(buildTrayMenuTemplate(this.context))
 		this.tray.setContextMenu(menu)
 	}
 
 	private loadIcon(file: string) {
-		const image = nativeImage.createFromPath(join(app.getAppPath(), 'resources', file))
+		const image = nativeImage.createFromPath(join(resourcesPath(), file))
+		if (process.platform === 'darwin' && file.includes('Template')) {
+			image.setTemplateImage(true)
+		}
 		return image.isEmpty() ? nativeImage.createEmpty() : image
-	}
-
-	private relativeTime(iso: string): string {
-		const deltaMs = Date.now() - new Date(iso).getTime()
-		const minutes = Math.max(1, Math.floor(deltaMs / 60_000))
-		return `${minutes}m ago`
 	}
 }

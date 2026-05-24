@@ -27,6 +27,11 @@ vi.mock('../../../../src/main/accounts/account-manager', () => {
 			listAccounts: () => [
 				{ id: 'a1', provider: 'gmail', email: 'a1@example.com', displayName: 'A1' },
 			],
+			getAccount: (accountId: string) => (
+				accountId === 'a1'
+					? { id: 'a1', provider: 'gmail', email: 'a1@example.com', displayName: 'A1' }
+					: undefined
+			),
 			getProvider: async () => ({
 				listMessages: providerMocks.listMessages,
 				getMessage: providerMocks.getMessage,
@@ -73,6 +78,39 @@ describe('OtpPollService', () => {
 		expect(providerMocks.listMessages).toHaveBeenCalledWith({ maxResults: 5 })
 	})
 
+	it('returns every OTP candidate found in the latest configured message window', async () => {
+		const firstDate = '2026-05-23T10:00:00.000Z'
+		const secondDate = '2026-05-23T10:01:00.000Z'
+		const thirdDate = '2026-05-23T10:02:00.000Z'
+		providerMocks.listMessages.mockResolvedValue({
+			messages: [
+				{ id: 'm1', accountId: 'a1', threadId: 't1', subject: 'Security code', from: { email: 'first@example.com' }, to: [], date: firstDate, snippet: '', labelIds: [], isRead: false, isStarred: false, attachments: [] },
+				{ id: 'm2', accountId: 'a1', threadId: 't2', subject: 'Receipt 2026', from: { email: 'shop@example.com' }, to: [], date: secondDate, snippet: '', labelIds: [], isRead: false, isStarred: false, attachments: [] },
+				{ id: 'm3', accountId: 'a1', threadId: 't3', subject: 'One-time password', from: { email: 'second@example.com' }, to: [], date: thirdDate, snippet: '', labelIds: [], isRead: false, isStarred: false, attachments: [] },
+			],
+		})
+		providerMocks.getMessage.mockImplementation(async (messageId: string) => {
+			if (messageId === 'm1') {
+				return { id: 'm1', accountId: 'a1', threadId: 't1', subject: 'Security code', from: { email: 'first@example.com' }, to: [], date: firstDate, snippet: '', bodyText: 'Your security code is 123456', labelIds: [], isRead: false, isStarred: false, attachments: [] }
+			}
+			if (messageId === 'm3') {
+				return { id: 'm3', accountId: 'a1', threadId: 't3', subject: 'One-time password', from: { email: 'second@example.com' }, to: [], date: thirdDate, snippet: '', bodyText: 'Your one-time password is 654321', labelIds: [], isRead: false, isStarred: false, attachments: [] }
+			}
+			return { id: 'm2', accountId: 'a1', threadId: 't2', subject: 'Receipt 2026', from: { email: 'shop@example.com' }, to: [], date: secondDate, snippet: '', bodyText: 'Order number 2026', labelIds: [], isRead: false, isStarred: false, attachments: [] }
+		})
+
+		const service = new OtpPollService({
+			config: { intervalMs: 10_000, lookbackMinutes: 5, maxEmailsPerPoll: 5 },
+		})
+		const results = await service.scanAccountById('a1')
+
+		expect(providerMocks.listMessages).toHaveBeenCalledWith({ maxResults: 5 })
+		expect(providerMocks.getMessage).toHaveBeenCalledTimes(3)
+		expect(results.map((result) => result.code)).toEqual(['123456', '654321'])
+		expect(results.map((result) => result.source.receivedAt)).toEqual([firstDate, thirdDate])
+		expect(service.getHistory()).toHaveLength(0)
+	})
+
 	it('stops scanning the current batch after the newest OTP is detected', async () => {
 		providerMocks.listMessages.mockResolvedValue({
 			messages: [
@@ -84,6 +122,17 @@ describe('OtpPollService', () => {
 		await service.pollAllAccounts()
 		expect(providerMocks.getMessage).toHaveBeenCalledTimes(1)
 		expect(providerMocks.getMessage).toHaveBeenCalledWith('m1')
+	})
+
+	it('re-evaluates seen messages during on-demand account checks', async () => {
+		const detected: string[] = []
+		const service = new OtpPollService({
+			onOtpDetected: (otp) => detected.push(otp.source.messageId),
+		})
+		await service.pollAccountById('a1')
+		await service.pollAccountById('a1')
+		expect(detected).toEqual(['m1', 'm1'])
+		expect(service.getHistory()).toHaveLength(1)
 	})
 
 	it('supports pause/resume toggles', async () => {

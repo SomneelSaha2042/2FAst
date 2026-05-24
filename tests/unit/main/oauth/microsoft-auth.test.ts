@@ -3,6 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const getAllAccountsMock = vi.fn()
 const acquireTokenSilentMock = vi.fn()
 
+const createCachedAccount = (homeAccountId: string) => ({
+	homeAccountId,
+	environment: 'login.windows.net',
+	tenantId: 'tenant-1',
+	username: `${homeAccountId}@example.com`,
+	localAccountId: `local-${homeAccountId}`,
+})
+
 vi.mock('electron', () => ({
 	shell: {
 		openExternal: vi.fn().mockResolvedValue(undefined),
@@ -23,6 +31,7 @@ vi.mock('@azure/msal-node', () => ({
 		async acquireTokenByCode(): Promise<unknown> {
 			return {
 				accessToken: 'access',
+				account: { homeAccountId: 'home-1' },
 				expiresOn: new Date('2027-01-01T00:00:00.000Z'),
 				scopes: ['Mail.ReadWrite'],
 			}
@@ -34,8 +43,8 @@ vi.mock('@azure/msal-node', () => ({
 			}
 		}
 
-		async acquireTokenSilent(): Promise<unknown> {
-			return acquireTokenSilentMock()
+		async acquireTokenSilent(request: unknown): Promise<unknown> {
+			return acquireTokenSilentMock(request)
 		}
 	},
 	CryptoProvider: class {
@@ -67,10 +76,32 @@ describe('microsoft auth', () => {
 	})
 
 	it('acquires access token silently from cache', async () => {
-		getAllAccountsMock.mockResolvedValue([{ homeAccountId: '1' }])
+		getAllAccountsMock.mockResolvedValue([createCachedAccount('1')])
 		acquireTokenSilentMock.mockResolvedValue({ accessToken: 'silent-token' })
 		const { acquireMicrosoftAccessToken } = await import('../../../../src/main/oauth/microsoft-auth')
 		const token = await acquireMicrosoftAccessToken('acc-2')
 		expect(token).toBe('silent-token')
+	})
+
+	it('selects the expected cached account when home account id is provided', async () => {
+		getAllAccountsMock.mockResolvedValue([createCachedAccount('other'), createCachedAccount('expected')])
+		acquireTokenSilentMock.mockResolvedValue({ accessToken: 'selected-token' })
+		const { acquireMicrosoftAccessToken } = await import('../../../../src/main/oauth/microsoft-auth')
+
+		const token = await acquireMicrosoftAccessToken('acc-3', 'expected')
+
+		expect(token).toBe('selected-token')
+		expect(acquireTokenSilentMock).toHaveBeenCalledWith(expect.objectContaining({
+			account: expect.objectContaining({ homeAccountId: 'expected' }),
+		}))
+	})
+
+	it('asks for reconnect when the expected cached account is missing', async () => {
+		getAllAccountsMock.mockResolvedValue([createCachedAccount('other')])
+		const { acquireMicrosoftAccessToken } = await import('../../../../src/main/oauth/microsoft-auth')
+
+		await expect(acquireMicrosoftAccessToken('acc-4', 'expected')).rejects.toThrow(
+			'Microsoft account cache is missing the expected account. Reconnect the account.'
+		)
 	})
 })

@@ -6,6 +6,8 @@ export interface Account {
 	readonly email: string
 	readonly displayName: string
 	readonly avatarUrl?: string
+	readonly oauthClientId?: string
+	readonly oauthAccountId?: string
 }
 
 export interface MessageAddress {
