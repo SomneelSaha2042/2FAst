@@ -1,5 +1,9 @@
 # 2Fast
 
+[![CI](https://github.com/SomneelSaha2042/2FAst/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SomneelSaha2042/2FAst/actions/workflows/ci.yml)
+![Tests](https://img.shields.io/badge/tests-56%20passing-brightgreen)
+![Version](https://img.shields.io/badge/version-0.9.0--beta.1-blue)
+
 2Fast is a tray-first desktop utility for finding one-time passwords in Gmail and Outlook without opening a full mail client. Connect your accounts, pick the mailbox you are waiting on, and 2Fast scans the latest messages for OTP-style codes so you can copy them quickly.
 
 The current beta is focused on a small, practical workflow: link accounts, reconnect them when tokens expire, scan recent messages on demand, and keep a short-lived OTP history in the tray.
@@ -45,6 +49,46 @@ The current beta is focused on a small, practical workflow: link accounts, recon
 | Testing | Vitest |
 | Packaging | electron-builder |
 | Package manager | pnpm |
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Renderer["Renderer process"]
+        React["React UI\nsettings, account setup, OTP window"]
+    end
+
+    subgraph Preload["Preload boundary"]
+        Bridge["contextBridge\nwindow.api / window.events"]
+    end
+
+    subgraph Main["Main process"]
+        IPC["Typed IPC handlers"]
+        Accounts["Account manager\nOAuth + token cache"]
+        Providers["Mail providers\nGmail + Outlook"]
+        OTP["OTP polling + extraction"]
+        Tray["System tray + native notifications"]
+        Store["Local settings\nand OTP history"]
+    end
+
+    subgraph External["External APIs"]
+        Gmail["Gmail API"]
+        Graph["Microsoft Graph"]
+    end
+
+    React --> Bridge
+    Bridge --> IPC
+    IPC --> Accounts
+    IPC --> OTP
+    Accounts --> Providers
+    OTP --> Providers
+    Providers --> Gmail
+    Providers --> Graph
+    OTP --> Tray
+    OTP --> Store
+```
+
+The renderer is intentionally sandboxed. All privileged operations run in the main process and are reached through the typed preload bridge.
 
 ## Integrated APIs
 
@@ -99,7 +143,7 @@ Run the full validation gate:
 pnpm verify
 ```
 
-`pnpm verify` runs TypeScript, ESLint, and Vitest.
+`pnpm verify` runs TypeScript, ESLint, and Vitest. The current suite has 56 passing tests across 17 test files.
 
 ## Build And Release
 
@@ -136,7 +180,7 @@ Planned improvements include:
 - Signed Windows and macOS releases
 - Automatic update support after signing and release infrastructure are ready
 - More configurable OTP extraction rules and sender trust settings
-- A possible migration from Electron to a Tauri backend to reduce runtime footprint while keeping the same tray-first workflow
+- A planned v2 Tauri runtime migration track to reduce desktop footprint while preserving the same tray-first workflow
 
 ## License
 
