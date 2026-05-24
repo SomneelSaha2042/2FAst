@@ -7,7 +7,6 @@ import { loadGoogleOAuthConfig } from './oauth/google-config.js'
 import { OtpPollService } from './otp/poll-service.js'
 import { TrayController } from './tray.js'
 import { buildAppMenu } from './menu.js'
-import { initAutoUpdater } from './updater.js'
 import { getOtpSettings } from './otp/settings.js'
 import { setAutoLaunch } from './startup.js'
 import { accountManager } from './accounts/account-manager.js'
@@ -41,6 +40,7 @@ let tray: TrayController | null = null
 let isQuitting = false
 
 const otpPollService = new OtpPollService({
+	logDirectory: () => app.getPath('logs'),
 	onOtpDetected: (otp) => {
 		settingsWindow?.webContents.send('otp:detected', otp)
 		pollWindow?.webContents.send('otp:detected', otp)
@@ -222,7 +222,6 @@ app.whenReady().then(() => {
 
 	const settings = getOtpSettings()
 	setAutoLaunch(settings.launchOnStartup)
-	void initAutoUpdater()
 
 	app.on('activate', () => {
 		openSettingsWindow()

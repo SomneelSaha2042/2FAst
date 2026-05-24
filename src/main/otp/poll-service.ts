@@ -1,6 +1,6 @@
 import Store from 'electron-store'
 import { appendFile, mkdir } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { accountManager } from '../accounts/account-manager.js'
 import type { Account } from '../../shared/models.js'
 import { buildOtpSource, extractOtp } from './patterns.js'
@@ -27,6 +27,7 @@ interface StoreApi<T> {
 	get: <K extends keyof T>(key: K) => T[K]
 	set: <K extends keyof T>(key: K, value: T[K]) => void
 }
+type LogDirectoryProvider = string | (() => string | undefined)
 
 const DEFAULT_CONFIG: PollServiceConfig = {
 	intervalMs: 10_000,
@@ -35,7 +36,9 @@ const DEFAULT_CONFIG: PollServiceConfig = {
 }
 const POLL_LOG_FILE = 'otp-poll.log'
 
-const getPollLogPath = (): string => join(process.cwd(), 'logs', POLL_LOG_FILE)
+const isPollDebugLoggingEnabled = (): boolean => process.env.TWOFAST_DEBUG_POLL === '1'
+
+const redactPollLogLine = (line: string): string => line.replace(/\bcode=\S+/g, 'code=[redacted]')
 
 export class OtpPollService {
 	private readonly otpStore: OtpStore
@@ -49,12 +52,16 @@ export class OtpPollService {
 	private readonly onOtpDetected: (otp: StoredOtp) => void
 	private readonly onOtpExpired: (otpId: string) => void
 	private readonly onPollStatus: (status: PollStatus) => void
+	private readonly debugLoggingEnabled: boolean
+	private readonly logDirectory?: LogDirectoryProvider
 
 	constructor(options?: {
 		readonly config?: Partial<PollServiceConfig>
 		readonly onOtpDetected?: (otp: StoredOtp) => void
 		readonly onOtpExpired?: (otpId: string) => void
 		readonly onPollStatus?: (status: PollStatus) => void
+		readonly debugLoggingEnabled?: boolean
+		readonly logDirectory?: LogDirectoryProvider
 	}) {
 		const settings = getOtpSettings()
 		this.config = {
@@ -69,6 +76,8 @@ export class OtpPollService {
 		this.onOtpDetected = options?.onOtpDetected ?? (() => {})
 		this.onOtpExpired = options?.onOtpExpired ?? (() => {})
 		this.onPollStatus = options?.onPollStatus ?? (() => {})
+		this.debugLoggingEnabled = options?.debugLoggingEnabled ?? isPollDebugLoggingEnabled()
+		this.logDirectory = options?.logDirectory
 	}
 
 	/**
@@ -213,7 +222,7 @@ export class OtpPollService {
 		const results: OtpResult[] = []
 		for (const item of listResult.messages) {
 			await this.writePollLog(
-				`[${new Date().toISOString()}] scan:item accountId=${account.id} messageId=${item.id} date=${item.date} from=${item.from.email} subject="${item.subject}"`
+				`[${new Date().toISOString()}] scan:item accountId=${account.id} messageId=${item.id} date=${item.date} from=${item.from.email} subjectLength=${item.subject.length}`
 			)
 			const message = await provider.getMessage(item.id)
 			const extracted = extractOtp(message.subject, message.bodyText ?? '', message.bodyHtml ?? '')
@@ -248,7 +257,7 @@ export class OtpPollService {
 		)
 		for (const item of listResult.messages) {
 			await this.writePollLog(
-				`[${new Date().toISOString()}] poll:item accountId=${account.id} messageId=${item.id} date=${item.date} from=${item.from.email} subject="${item.subject}"`
+				`[${new Date().toISOString()}] poll:item accountId=${account.id} messageId=${item.id} date=${item.date} from=${item.from.email} subjectLength=${item.subject.length}`
 			)
 			if (!options?.includeSeen && this.seenIds.has(item.id)) {
 				await this.writePollLog(
@@ -259,7 +268,7 @@ export class OtpPollService {
 			this.seenIds.add(item.id)
 			const message = await provider.getMessage(item.id)
 			await this.writePollLog(
-				`[${new Date().toISOString()}] poll:get accountId=${account.id} messageId=${message.id} receivedAt=${message.date} from=${message.from.email} subject="${message.subject}"`
+				`[${new Date().toISOString()}] poll:get accountId=${account.id} messageId=${message.id} receivedAt=${message.date} from=${message.from.email} subjectLength=${message.subject.length}`
 			)
 			const extracted = extractOtp(message.subject, message.bodyText ?? '', message.bodyHtml ?? '')
 			if (!extracted) {
@@ -299,10 +308,17 @@ export class OtpPollService {
 	}
 
 	private async writePollLog(line: string): Promise<void> {
+		if (!this.debugLoggingEnabled || !this.logDirectory) {
+			return
+		}
 		try {
-			const path = getPollLogPath()
-			await mkdir(dirname(path), { recursive: true })
-			await appendFile(path, `${line}\n`, 'utf8')
+			const directory = typeof this.logDirectory === 'function' ? this.logDirectory() : this.logDirectory
+			if (!directory) {
+				return
+			}
+			const path = join(directory, POLL_LOG_FILE)
+			await mkdir(directory, { recursive: true })
+			await appendFile(path, `${redactPollLogLine(line)}\n`, 'utf8')
 		} catch {
 			// Logging must never break OTP polling flow.
 		}

@@ -1,6 +1,6 @@
 appId: com.2fast.app
 productName: 2Fast
-copyright: Copyright © 2026
+copyright: Copyright (c) 2026
 asar: true
 
 directories:
@@ -20,9 +20,6 @@ extraResources:
       - icon.icns
       - tray-icon*.png
 
-publish:
-  provider: github
-
 mac:
   target:
     - target: dmg
@@ -38,6 +35,7 @@ win:
     - target: nsis
       arch: [x64]
   icon: resources/icon.ico
+  signAndEditExecutable: false
 
 linux:
   target:

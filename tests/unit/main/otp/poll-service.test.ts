@@ -5,6 +5,16 @@ const providerMocks = vi.hoisted(() => ({
 	getMessage: vi.fn(),
 }))
 
+const fsMocks = vi.hoisted(() => ({
+	appendFile: vi.fn().mockResolvedValue(undefined),
+	mkdir: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('node:fs/promises', () => ({
+	appendFile: fsMocks.appendFile,
+	mkdir: fsMocks.mkdir,
+}))
+
 vi.mock('electron-store', () => {
 	class MockStore<T extends Record<string, unknown>> {
 		private readonly data: Record<string, unknown>
@@ -49,6 +59,7 @@ import { OtpPollService } from '../../../../src/main/otp/poll-service'
 describe('OtpPollService', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
+		vi.unstubAllEnvs()
 		providerMocks.listMessages.mockResolvedValue({
 			messages: [
 				{ id: 'm1', accountId: 'a1', threadId: 't1', subject: 'Your code is 123456', from: { email: 'x@example.com' }, to: [], date: new Date().toISOString(), snippet: '', labelIds: [], isRead: false, isStarred: false, attachments: [] },
@@ -142,5 +153,47 @@ describe('OtpPollService', () => {
 		service.resume()
 		await service.pollAllAccounts()
 		expect(service.getHistory().length).toBeGreaterThanOrEqual(0)
+	})
+
+	it('does not write debug poll logs by default', async () => {
+		const service = new OtpPollService({
+			config: { intervalMs: 10_000, lookbackMinutes: 5, maxEmailsPerPoll: 5 },
+			logDirectory: 'app-logs',
+		})
+
+		await service.scanAccountById('a1')
+
+		expect(fsMocks.mkdir).not.toHaveBeenCalled()
+		expect(fsMocks.appendFile).not.toHaveBeenCalled()
+	})
+
+	it('writes redacted debug poll logs when explicitly enabled', async () => {
+		const service = new OtpPollService({
+			config: { intervalMs: 10_000, lookbackMinutes: 5, maxEmailsPerPoll: 5 },
+			debugLoggingEnabled: true,
+			logDirectory: 'app-logs',
+		})
+
+		await service.scanAccountById('a1')
+
+		const loggedText = fsMocks.appendFile.mock.calls
+			.map((call) => String(call[1]))
+			.join('')
+		expect(fsMocks.mkdir).toHaveBeenCalledWith('app-logs', { recursive: true })
+		expect(loggedText).toContain('code=[redacted]')
+		expect(loggedText).not.toContain('123456')
+		expect(loggedText).not.toContain('Your code is')
+	})
+
+	it('enables debug poll logs from TWOFAST_DEBUG_POLL', async () => {
+		vi.stubEnv('TWOFAST_DEBUG_POLL', '1')
+		const service = new OtpPollService({
+			config: { intervalMs: 10_000, lookbackMinutes: 5, maxEmailsPerPoll: 5 },
+			logDirectory: 'app-logs',
+		})
+
+		await service.scanAccountById('a1')
+
+		expect(fsMocks.appendFile).toHaveBeenCalled()
 	})
 })

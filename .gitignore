@@ -1,14 +1,29 @@
+# Dependencies and package-manager state
 node_modules/
+.pnpm-store/
+
+# Build and release output
 dist/
 release/
-.vscode/
-.DS_Store
+out/
+
+# Local app/runtime data
+logs/
+*.log
+
+# Local environment
 .env
 .env.*
 !.env.example
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Tool caches
 .pnpm-debug.log
-*.log
 coverage/
 .eslintcache
 *.tsbuildinfo
-.pnpm-store/

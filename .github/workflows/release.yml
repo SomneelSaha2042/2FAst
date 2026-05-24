@@ -18,7 +18,14 @@ jobs:
         with:
           node-version: 22
       - run: pnpm install --frozen-lockfile
+      - run: pnpm verify
       - run: pnpm build
-      - run: pnpm exec electron-builder --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      - run: pnpm exec electron-builder --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 2fast-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+          if-no-files-found: error
