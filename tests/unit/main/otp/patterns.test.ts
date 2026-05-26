@@ -24,6 +24,24 @@ describe('extractOtp', () => {
 		expect(result?.code).toContain('https://example.com/verify/abc')
 	})
 
+	it('skips notification links that only have generic email wording', () => {
+		const result = extractOtp(
+			'From Breaking Bad & Better Call Saul',
+			'Somneel Kumar, your post update is here: https://www.linkedin.com/comm/feed/?trk=eml-email_weekly_analytics_recap_v2 Manage your email preferences.',
+			''
+		)
+		expect(result).toBeNull()
+	})
+
+	it('skips repository notification links with code-like context in tracking params', () => {
+		const result = extractOtp(
+			'[SomneelSaha2042/2FAst] Discussion update',
+			'View it on GitHub: https://github.com/SomneelSaha2042/2FAst/discussions/12?notification_referrer_id=NT_kwDO_code Manage notification settings.',
+			''
+		)
+		expect(result).toBeNull()
+	})
+
 	it('skips newsletter subjects', () => {
 		expect(extractOtp('Weekly newsletter with code 123456', 'OTP 123456', '')).toBeNull()
 	})

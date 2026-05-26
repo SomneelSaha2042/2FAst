@@ -60,6 +60,8 @@ const EXPLICIT_PATTERNS: readonly RegExp[] = [
 const NUMERIC_CODE_PATTERN = /\b\d{4,8}\b/g
 const ALPHANUMERIC_TOKEN_PATTERN = /\b[A-Z0-9]{6,10}\b/g
 const URL_PATTERN = /(https?:\/\/[^\s"'<>]+)(?=[\s"'<>]|$)/gi
+const VERIFICATION_URL_CONTEXT_PATTERN = /\b(?:verify|verification|confirm|activate|authenticate|authentication|sign[-\s]?in|login|magic\s+link|reset\s+password|secure\s+link)\b/i
+const VERIFICATION_URL_PATH_PATTERN = /(?:^|[/-])(?:verify|verification|confirm|activate|authenticate|authentication|signin|sign-in|login|magic-link|reset-password|otp|2fa|mfa)(?:[/?#-]|$)/i
 
 const stripHtml = (value: string): string =>
 	value
@@ -196,6 +198,14 @@ const findUrlVerification = (text: string): OtpMatch | null => {
 	for (const match of text.matchAll(URL_PATTERN)) {
 		const url = match[1]
 		if (!url) {
+			continue
+		}
+		const urlIndex = match.index ?? 0
+		const contextStart = Math.max(0, urlIndex - 80)
+		const contextEnd = Math.min(text.length, urlIndex + url.length + 80)
+		const surrounding = text.slice(contextStart, contextEnd)
+		const normalizedUrl = url.toLowerCase()
+		if (!VERIFICATION_URL_CONTEXT_PATTERN.test(surrounding) && !VERIFICATION_URL_PATH_PATTERN.test(normalizedUrl)) {
 			continue
 		}
 		return {

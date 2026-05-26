@@ -2,6 +2,8 @@ appId: com.2fast.app
 productName: 2Fast
 copyright: Copyright (c) 2026
 asar: true
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+afterPack: scripts/after-pack.mjs
 
 directories:
   output: release
@@ -35,7 +37,8 @@ win:
     - target: nsis
       arch: [x64]
   icon: resources/icon.ico
-  signExecutable: false
+  executableName: 2Fast
+  signAndEditExecutable: false
 
 linux:
   target:
@@ -47,3 +50,6 @@ linux:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  installerHeaderIcon: resources/icon.ico

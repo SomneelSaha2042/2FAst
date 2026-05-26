@@ -13,6 +13,8 @@ import { accountManager } from './accounts/account-manager.js'
 import type { Account } from '../shared/models.js'
 import type { PollStartPayload } from '../shared/ipc-api.js'
 
+const APP_ID = 'com.2fast.app'
+
 interface WindowState {
 	readonly x: number
 	readonly y: number
@@ -38,6 +40,10 @@ let settingsWindow: BrowserWindow | null = null
 let pollWindow: BrowserWindow | null = null
 let tray: TrayController | null = null
 let isQuitting = false
+
+if (process.platform === 'win32') {
+	app.setAppUserModelId(APP_ID)
+}
 
 const otpPollService = new OtpPollService({
 	logDirectory: () => app.getPath('logs'),

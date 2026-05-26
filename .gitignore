@@ -23,6 +23,7 @@ logs/
 Thumbs.db
 
 # Tool caches
+.tmp-asar-inspect/
 .pnpm-debug.log
 coverage/
 .eslintcache

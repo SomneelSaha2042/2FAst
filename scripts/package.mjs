@@ -8,6 +8,7 @@ const electronBuilderCliPath = require.resolve('electron-builder/cli.js')
 const child = spawn(process.execPath, [electronBuilderCliPath, '--publish', 'never'], {
 	env: {
 		...process.env,
+		CSC_IDENTITY_AUTO_DISCOVERY: 'false',
 		ELECTRON_BUILDER_DISABLE_BUILD_CACHE: 'true',
 	},
 	stdio: 'inherit',
