@@ -11,7 +11,7 @@
     "clean": "node scripts/clean.mjs dist",
     "clean:release": "node scripts/clean.mjs release",
     "build": "pnpm run clean && vite build --config vite.config.ts && tsc -p src/main/tsconfig.json && tsc -p src/preload/tsconfig.json",
-    "dist": "pnpm run build && pnpm run clean:release && electron-builder --publish never",
+    "dist": "pnpm run build && pnpm run clean:release && node scripts/package.mjs",
     "verify": "tsc --noEmit -p src/main/tsconfig.json && tsc --noEmit -p src/preload/tsconfig.json && tsc --noEmit -p src/renderer/tsconfig.json && eslint . && vitest run",
     "lint": "eslint .",
     "format": "prettier --write .",

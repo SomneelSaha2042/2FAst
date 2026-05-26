@@ -4,13 +4,15 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+  windows:
+    name: Windows beta
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -20,12 +22,21 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify
       - run: pnpm build
-      - run: pnpm exec electron-builder --publish never
+      - run: node scripts/package.mjs
       - uses: actions/upload-artifact@v4
         with:
-          name: 2fast-${{ matrix.os }}
+          name: 2fast-windows-x64
           path: |
             release/*.exe
-            release/*.dmg
-            release/*.AppImage
+            release/*.blockmap
+            release/latest.yml
           if-no-files-found: error
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          $assets = Get-ChildItem -Path release -Include *.exe,*.blockmap,latest.yml -File -Recurse | ForEach-Object { $_.FullName }
+          gh release create $env:TAG_NAME $assets --title "2Fast $env:TAG_NAME" --notes "Unsigned Windows x64 beta build. Windows may show a security prompt on first launch."
