@@ -23,6 +23,6 @@ child.on('exit', (code, signal) => {
 })
 
 child.on('error', (error) => {
-	console.error(error)
+	process.stderr.write(`${String(error)}\n`)
 	process.exit(1)
 })
