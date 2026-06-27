@@ -12,6 +12,8 @@ directories:
 files:
   - dist/**/*
   - package.json
+  - '!dist/**/*.d.ts'
+  - '!dist/**/*.tsbuildinfo'
 
 extraResources:
   - from: resources

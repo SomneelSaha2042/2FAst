@@ -2,6 +2,7 @@ import { Menu, Notification, Tray, clipboard, nativeImage, type MenuItemConstruc
 import { join } from 'node:path'
 import { app } from 'electron'
 import type { Account } from '../shared/models.js'
+import { getProviderDescriptor } from '../shared/provider-registry.js'
 import type { StoredOtp } from './otp/otp-store.js'
 
 export interface TrayContext {
@@ -24,11 +25,11 @@ const copyOtpFromMenu = (otp: StoredOtp, context: TrayContext): void => {
 
 const accountItems = (
 	accounts: readonly Account[],
-	provider: 'gmail' | 'outlook',
+	provider: Account['provider'],
 	context: TrayContext
 ): MenuItemConstructorOptions[] => {
 	const providerAccounts = accounts.filter((account) => account.provider === provider)
-	const title = provider === 'gmail' ? 'Gmail' : 'Outlook'
+	const title = getProviderDescriptor(provider)?.displayName ?? provider
 	if (providerAccounts.length === 0) {
 		return [
 			{ label: title, enabled: false },
@@ -52,12 +53,16 @@ const accountItems = (
 export function buildTrayMenuTemplate(context: TrayContext): MenuItemConstructorOptions[] {
 	const otps = context.getRecentOtps().slice(0, 5)
 	const accounts = context.getAccounts()
+	const providers = [...new Set(accounts.map((account) => account.provider))]
 	return [
 		{ label: '2Fast', enabled: false },
 		{ type: 'separator' },
-		...accountItems(accounts, 'gmail', context),
-		{ type: 'separator' },
-		...accountItems(accounts, 'outlook', context),
+		...(providers.length > 0
+			? providers.flatMap((provider, index) => [
+				...(index > 0 ? [{ type: 'separator' as const }] : []),
+				...accountItems(accounts, provider, context),
+			])
+			: [{ label: 'No accounts connected', enabled: false }]),
 		{ type: 'separator' },
 		{ label: 'Recent OTPs', enabled: false },
 		...otps.map((otp) => ({

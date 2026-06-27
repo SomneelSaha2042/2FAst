@@ -1,13 +1,18 @@
 import Store from 'electron-store'
 import { randomUUID } from 'node:crypto'
 import { google } from 'googleapis'
+import type { AccountAddRequest, ImapAccountInput, ImapReconnectRequest } from '../../shared/ipc-api.js'
 import type { Account, Provider } from '../../shared/models.js'
+import { PROVIDER_REGISTRY, getProviderDescriptor } from '../../shared/provider-registry.js'
 import { loadGoogleOAuthConfig, loadGoogleOAuthConfigByClientId, type GoogleOAuthConfig } from '../oauth/google-config.js'
 import { acquireMicrosoftAccessToken, runMicrosoftOAuthFlow } from '../oauth/microsoft-auth.js'
+import type { AccountConnector } from '../providers/connectors.js'
 import { GmailProvider } from '../providers/gmail.js'
+import { ImapProvider } from '../providers/imap.js'
 import { OutlookProvider } from '../providers/outlook.js'
 import type { MailProvider } from '../providers/types.js'
 import { runOAuthFlow, type OAuthConfig, type OAuthTokens } from '../oauth/oauth-handler.js'
+import { deleteImapCredentials, loadImapCredentials, saveImapCredentials, type ImapCredentials } from './imap-credential-store.js'
 import { deleteTokens, saveTokens } from './token-store.js'
 
 interface AccountStoreShape { readonly accounts: readonly Account[] }
@@ -21,6 +26,40 @@ const defaultStore: AccountStoreShape = { accounts: [] }
 export class AccountManager {
 	private readonly store = new Store<AccountStoreShape>({ name: 'accounts', defaults: defaultStore })
 	private googleConfig: GoogleOAuthConfig | null = null
+	private readonly connectors = new Map<Provider, AccountConnector>()
+
+	constructor() {
+		this.registerConnector({
+			providers: ['gmail'],
+			add: async (request) => {
+				if (request.authentication !== 'oauth' || request.provider !== 'gmail') throw new Error('Invalid Gmail account request')
+				return this.addGoogleAccount()
+			},
+			reconnect: async (account) => this.reconnectGoogleAccount(account),
+			getProvider: async (account) => {
+				const oauthConfig = await this.getGoogleOAuthConfigForAccount(account)
+				return new GmailProvider(account.id, oauthConfig.client_id, oauthConfig.client_secret)
+			},
+		})
+		this.registerConnector({
+			providers: ['outlook'],
+			add: async (request) => {
+				if (request.authentication !== 'oauth' || request.provider !== 'outlook') throw new Error('Invalid Outlook account request')
+				return this.addMicrosoftAccount()
+			},
+			reconnect: async (account) => this.reconnectMicrosoftAccount(account),
+			getProvider: async (account) => new OutlookProvider(account.id, await acquireMicrosoftAccessToken(account.id, account.oauthAccountId)),
+		})
+		this.registerConnector({
+			providers: PROVIDER_REGISTRY.filter((descriptor) => descriptor.transport === 'imap').map((descriptor) => descriptor.id),
+			add: async (request) => {
+				if (request.authentication !== 'app-password') throw new Error('Invalid IMAP account request')
+				return this.addImapAccount(request)
+			},
+			reconnect: async (account, request) => this.reconnectImapAccount(account, request),
+			getProvider: async (account) => this.getImapProvider(account),
+		})
+	}
 
 	private storeApi(): StoreApi<AccountStoreShape> { return this.store as unknown as StoreApi<AccountStoreShape> }
 	private readAccounts(): readonly Account[] { return this.storeApi().get('accounts') }
@@ -57,34 +96,105 @@ export class AccountManager {
 
 	/** Removes an account record and its encrypted token file. @param id Account identifier. @returns Promise that resolves once metadata and tokens are deleted. */
 	async removeAccount(id: string): Promise<void> {
-		await deleteTokens(id)
+		await Promise.all([deleteTokens(id), deleteImapCredentials(id)])
 		this.writeAccounts(this.readAccounts().filter((account) => account.id !== id))
 	}
 
-	/** Adds an account for a specific provider. @param provider Target provider. @returns Created account metadata. */
-	async addAccount(provider: Provider): Promise<Account> {
-		if (provider === 'gmail') return this.addGoogleAccount()
-		if (provider === 'outlook') return this.addMicrosoftAccount()
-		throw new Error(`Unsupported provider: ${provider}`)
+	/** Adds an account using its registered connector. @param request Validated account connection request. @returns Created account metadata. */
+	async addAccount(request: AccountAddRequest): Promise<Account> {
+		return this.getConnector(request.provider).add(request)
 	}
 
-	/** Reconnects an existing account by replacing only its OAuth token state. @param id Account identifier. @returns Updated account metadata. */
-	async reconnectAccount(id: string): Promise<Account> {
+	/** Reconnects an existing account using its registered connector. @param id Account identifier. @param request Optional replacement IMAP credentials. @returns Updated account metadata. */
+	async reconnectAccount(id: string, request?: ImapReconnectRequest): Promise<Account> {
 		const account = this.getAccount(id)
 		if (!account) throw new Error(`Account not found: ${id}`)
-		if (account.provider === 'gmail') return this.reconnectGoogleAccount(account)
-		if (account.provider === 'outlook') return this.reconnectMicrosoftAccount(account)
-		throw new Error(`Unsupported provider: ${account.provider}`)
+		return this.getConnector(account.provider).reconnect(account, request)
 	}
 
 	/** Resolves an authenticated provider implementation for an account. @param accountId Internal account identifier. @returns Mail provider bound to account credentials. */
 	async getProvider(accountId: string): Promise<MailProvider> {
 		const account = this.getAccount(accountId)
 		if (!account) throw new Error(`Account not found: ${accountId}`)
-		if (account.provider === 'outlook') return new OutlookProvider(account.id, await acquireMicrosoftAccessToken(account.id, account.oauthAccountId))
-		if (account.provider !== 'gmail') throw new Error(`Unsupported provider: ${account.provider}`)
-		const oauthConfig = await this.getGoogleOAuthConfigForAccount(account)
-		return new GmailProvider(account.id, oauthConfig.client_id, oauthConfig.client_secret)
+		return this.getConnector(account.provider).getProvider(account)
+	}
+
+	private registerConnector(connector: AccountConnector): void {
+		for (const provider of connector.providers) {
+			if (this.connectors.has(provider)) throw new Error(`Duplicate account connector: ${provider}`)
+			this.connectors.set(provider, connector)
+		}
+	}
+
+	private getConnector(provider: Provider): AccountConnector {
+		const connector = this.connectors.get(provider)
+		if (!connector) throw new Error(`Unsupported provider: ${provider}`)
+		return connector
+	}
+
+	private async addImapAccount(request: ImapAccountInput): Promise<Account> {
+		const accountId = randomUUID()
+		const credentials = this.resolveImapCredentials(request.provider, request)
+		const account: Account = {
+			id: accountId,
+			provider: request.provider,
+			email: this.normalizeEmail(request.email),
+			displayName: this.normalizeEmail(request.email),
+		}
+		await new ImapProvider(account.id, account.provider, credentials).validateConnection()
+		await saveImapCredentials(account.id, credentials)
+		this.writeAccounts([...this.readAccounts(), account])
+		return account
+	}
+
+	private async reconnectImapAccount(account: Account, request?: ImapReconnectRequest): Promise<Account> {
+		if (!request) throw new Error(`Enter a new app password to reconnect ${account.email}.`)
+		const existing = await loadImapCredentials(account.id)
+		const provider = account.provider as ImapAccountInput['provider']
+		const credentials = this.resolveImapCredentials(provider, {
+			provider,
+			email: account.email,
+			username: request.username,
+			password: request.password,
+			host: request.host,
+			port: request.port,
+			security: request.security,
+		}, existing)
+		await new ImapProvider(account.id, account.provider, credentials).validateConnection()
+		await saveImapCredentials(account.id, credentials)
+		return account
+	}
+
+	private async getImapProvider(account: Account): Promise<MailProvider> {
+		const credentials = await loadImapCredentials(account.id)
+		if (!credentials) throw new Error(`Missing IMAP credentials for ${account.email}. Reconnect the account.`)
+		return new ImapProvider(account.id, account.provider, credentials)
+	}
+
+	private resolveImapCredentials(provider: ImapAccountInput['provider'], input: ImapAccountInput, existing?: ImapCredentials | null): ImapCredentials {
+		const descriptor = getProviderDescriptor(provider)
+		if (!descriptor || descriptor.transport !== 'imap') throw new Error(`Unsupported IMAP provider: ${provider}`)
+		const username = input.username.trim()
+		const password = input.password
+		if (!username || !password) throw new Error('IMAP username and app password are required')
+		if (provider !== 'imap' && (input.host !== undefined || input.port !== undefined || input.security !== undefined)) {
+			throw new Error(`Server settings cannot override the ${descriptor.displayName} preset`)
+		}
+		const preset = descriptor.imapPreset
+		const host = preset?.host ?? input.host?.trim() ?? existing?.host
+		const port = preset?.port ?? input.port ?? existing?.port
+		const security = preset?.security ?? input.security ?? existing?.security
+		if (!host || !/^(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|::1)$/i.test(host) || host.includes('..')) throw new Error('Invalid IMAP host')
+		if (!port || !Number.isInteger(port) || port < 1 || port > 65_535) throw new Error('Invalid IMAP port')
+		if (security !== 'tls' && security !== 'starttls') throw new Error('Custom IMAP must use TLS or STARTTLS')
+		if (provider === 'proton' && host !== '127.0.0.1' && host !== 'localhost' && host !== '::1') throw new Error('Proton Bridge must use a loopback host')
+		return { host, port, security, username, password, allowSelfSigned: provider === 'proton' }
+	}
+
+	private normalizeEmail(email: string): string {
+		const normalized = email.trim().toLowerCase()
+		if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalized)) throw new Error('Invalid email address')
+		return normalized
 	}
 
 	private async getGoogleOAuthConfig(): Promise<GoogleOAuthConfig> {

@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { useMemo, useState } from 'react'
+import type { Provider } from '../../shared/models'
 import MessageView from '../components/MessageView'
 import Sidebar from '../components/Sidebar'
 import AccountSwitcher from '../components/AccountSwitcher'
@@ -50,8 +51,11 @@ const UnifiedInboxPage = (): ReactElement => {
     setHookSelectedMessageId(messageId)
   }
 
-  const addAccount = async (provider: 'gmail' | 'outlook'): Promise<void> => {
-    const result = await window.api['accounts:add'](provider)
+  const addAccount = async (provider: Provider): Promise<void> => {
+    if (provider !== 'gmail' && provider !== 'outlook') {
+      throw new Error('Use the settings window to add IMAP accounts')
+    }
+    const result = await window.api['accounts:add']({ authentication: 'oauth', provider })
     if (result.success && result.data) {
       await refetchAccounts()
       setActiveAccount(result.data.id)

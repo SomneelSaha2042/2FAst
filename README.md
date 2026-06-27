@@ -1,16 +1,16 @@
 # 2Fast
 
 [![CI](https://github.com/SomneelSaha2042/2FAst/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SomneelSaha2042/2FAst/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-56%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-71%20passing-brightgreen)
 ![Version](https://img.shields.io/badge/version-0.9.0--beta.1-blue)
 
-2Fast is a tray-first desktop utility for finding one-time passwords in Gmail and Outlook without opening a full mail client. Connect your accounts, pick the mailbox you are waiting on, and 2Fast scans the latest messages for OTP-style codes so you can copy them quickly.
+2Fast is a tray-first desktop utility for finding one-time passwords in Gmail, Outlook, and secure IMAP accounts without opening a full mail client. Connect your accounts, pick the mailbox you are waiting on, and 2Fast scans the latest messages for OTP-style codes so you can copy them quickly.
 
 The current beta is focused on a small, practical workflow: link accounts, reconnect them when tokens expire, scan recent messages on demand, and keep a short-lived OTP history in the tray.
 
 ## Features
 
-- Multi-account Gmail and Outlook linking
+- Multi-account Gmail, Outlook, Yahoo, iCloud, Fastmail, Zoho, Proton Bridge, and custom IMAP linking
 - Bring-your-own Google OAuth client setup for Gmail
 - Microsoft public-client OAuth with PKCE for Outlook
 - On-demand OTP scans from the tray account menu
@@ -65,7 +65,7 @@ flowchart LR
     subgraph Main["Main process"]
         IPC["Typed IPC handlers"]
         Accounts["Account manager\nOAuth + token cache"]
-        Providers["Mail providers\nGmail + Outlook"]
+        Providers["Mail providers\nGmail + Outlook + IMAP"]
         OTP["OTP polling + extraction"]
         Tray["System tray + native notifications"]
         Store["Local settings\nand OTP history"]
@@ -174,8 +174,8 @@ The distributable Windows installer is written to `release/2Fast Setup <version>
 
 Planned improvements include:
 
-- Additional email providers, including Proton Mail where a practical local/API integration path is available
-- Better provider abstraction for adding Yahoo, iCloud, Fastmail, and IMAP-style accounts
+- OAuth authentication for third-party protocol providers
+- SMTP sending and JMAP support
 - Smaller packaged builds through deeper dependency trimming
 - Signed Windows and macOS releases
 - Automatic update support after signing and release infrastructure are ready

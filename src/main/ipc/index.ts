@@ -1,17 +1,26 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import type { IpcApi, IpcResult, OtpSettings } from '../../shared/ipc-api.js'
 import { accountManager } from '../accounts/account-manager.js'
-import type { Account, Provider } from '../../shared/models.js'
+import type { Account, ProviderCapabilities, ProviderDescriptor } from '../../shared/models.js'
+import { PROVIDER_REGISTRY, getProviderDescriptor } from '../../shared/provider-registry.js'
 import { deleteGoogleOAuthConfig, hasValidGoogleOAuthConfig, saveGoogleOAuthConfig } from '../oauth/google-config.js'
 import { cancelActiveOAuthFlow } from '../oauth/oauth-handler.js'
 import { cancelActiveMicrosoftOAuthFlow } from '../oauth/microsoft-auth.js'
 import type { OtpPollService } from '../otp/poll-service.js'
 import { getOtpSettings, updateOtpSettings } from '../otp/settings.js'
 import { setAutoLaunch } from '../startup.js'
+import { isAccountAddRequest, isImapReconnectRequest } from './validators.js'
 
 const notImplemented = (): IpcResult<never> => ({ success: false, error: 'Not implemented' })
 const formatError = (error: unknown): IpcResult<never> => ({ success: false, error: error instanceof Error ? error.message : 'Unknown error' })
-const isProvider = (value: unknown): value is Provider => value === 'gmail' || value === 'outlook'
+const unsupportedOrNotImplemented = (accountId: unknown, capability: keyof ProviderCapabilities): IpcResult<never> => {
+	if (typeof accountId !== 'string' || accountId.length === 0) return formatError(new Error('Invalid accountId for mail operation'))
+	const account = accountManager.getAccount(accountId)
+	if (!account) return formatError(new Error(`Account not found: ${accountId}`))
+	const descriptor = getProviderDescriptor(account.provider)
+	if (!descriptor?.capabilities[capability]) return formatError(new Error(`Provider ${account.provider} does not support ${capability}`))
+	return notImplemented()
+}
 
 const isListMessagesOptions = (value: unknown): value is { labelId?: string; folderId?: string; query?: string; searchText?: string; receivedAfter?: string; pageToken?: string; maxResults?: number } => {
 	if (value === undefined) return true
@@ -86,15 +95,22 @@ const registerIpcHandlers = (): void => {
 			return { success: true, data: { canceled: canceledGoogle || canceledMicrosoft } }
 		} catch (error) { return formatError(error) }
 	})
+	ipcMain.handle('providers:list', async (): Promise<IpcResult<readonly ProviderDescriptor[]>> => {
+		try { return { success: true, data: PROVIDER_REGISTRY } } catch (error) { return formatError(error) }
+	})
 
-	ipcMain.handle('accounts:add', async (_event, provider: unknown): Promise<IpcResult<Account>> => {
-		try { if (!isProvider(provider)) throw new Error('Invalid provider for accounts:add'); return { success: true, data: await accountManager.addAccount(provider) } } catch (error) { return formatError(error) }
+	ipcMain.handle('accounts:add', async (_event, request: unknown): Promise<IpcResult<Account>> => {
+		try { if (!isAccountAddRequest(request)) throw new Error('Invalid request for accounts:add'); return { success: true, data: await accountManager.addAccount(request) } } catch (error) { return formatError(error) }
 	})
 	ipcMain.handle('accounts:list', async (): Promise<IpcResult<Account[]>> => {
 		try { return { success: true, data: [...accountManager.listAccounts()] } } catch (error) { return formatError(error) }
 	})
-	ipcMain.handle('accounts:reconnect', async (_event, accountId: unknown): Promise<IpcResult<Account>> => {
-		try { if (typeof accountId !== 'string' || accountId.length === 0) throw new Error('Invalid accountId for accounts:reconnect'); return { success: true, data: await accountManager.reconnectAccount(accountId) } } catch (error) { return formatError(error) }
+	ipcMain.handle('accounts:reconnect', async (_event, accountId: unknown, request: unknown): Promise<IpcResult<Account>> => {
+		try {
+			if (typeof accountId !== 'string' || accountId.length === 0) throw new Error('Invalid accountId for accounts:reconnect')
+			if (request !== undefined && !isImapReconnectRequest(request)) throw new Error('Invalid credentials for accounts:reconnect')
+			return { success: true, data: await accountManager.reconnectAccount(accountId, request) }
+		} catch (error) { return formatError(error) }
 	})
 	ipcMain.handle('accounts:remove', async (_event, accountId: unknown): Promise<IpcResult<void>> => {
 		try { if (typeof accountId !== 'string' || accountId.length === 0) throw new Error('Invalid accountId for accounts:remove'); await accountManager.removeAccount(accountId); return { success: true } } catch (error) { return formatError(error) }
@@ -121,6 +137,7 @@ const registerIpcHandlers = (): void => {
 			if (typeof accountId !== 'string' || accountId.length === 0) throw new Error('Invalid accountId for mail:getThread')
 			if (typeof threadId !== 'string' || threadId.length === 0) throw new Error('Invalid threadId for mail:getThread')
 			const provider = await accountManager.getProvider(accountId)
+			if (!provider.getThread) throw new Error(`Provider ${provider.provider} does not support threads`)
 			return { success: true, data: await provider.getThread(threadId) }
 		} catch (error) { return formatError(error) }
 	})
@@ -181,10 +198,16 @@ const registerIpcHandlers = (): void => {
 		try { (BrowserWindow.fromWebContents(event.sender) ?? mainWindow)?.minimize(); return { success: true } } catch (error) { return formatError(error) }
 	})
 
-	const unimplementedChannels: readonly (keyof IpcApi)[] = ['mail:sendMessage', 'mail:replyToMessage', 'mail:trashMessage', 'mail:toggleRead', 'mail:toggleStar']
-	unimplementedChannels.forEach((channel) => {
-		ipcMain.handle(channel, async () => {
-			try { return notImplemented() } catch (error) { return formatError(error) }
+	const unimplementedChannels: readonly { readonly channel: keyof IpcApi; readonly capability: keyof ProviderCapabilities }[] = [
+		{ channel: 'mail:sendMessage', capability: 'send' },
+		{ channel: 'mail:replyToMessage', capability: 'send' },
+		{ channel: 'mail:trashMessage', capability: 'mutations' },
+		{ channel: 'mail:toggleRead', capability: 'mutations' },
+		{ channel: 'mail:toggleStar', capability: 'mutations' },
+	]
+	unimplementedChannels.forEach(({ channel, capability }) => {
+		ipcMain.handle(channel, async (_event, accountId: unknown) => {
+			try { return unsupportedOrNotImplemented(accountId, capability) } catch (error) { return formatError(error) }
 		})
 	})
 }

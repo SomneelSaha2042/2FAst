@@ -269,6 +269,7 @@ Base URL: `https://graph.microsoft.com/v1.0`
 | 6 | Multi-account UX | AccountManager, account switcher sidebar, add/remove accounts | ✅ Done |
 | 7 | OTP Query & Extraction Engine | Manual per-account OTP query, regex OTP extraction, clipboard + notifications, OTP feed UI | 🔴 Next |
 | 8 | Tray UI, Polish & Packaging | System tray, compact popover, settings, electron-builder, CI, README | 🔴 Pending |
+| 9 | Protocol-based providers | Provider registry, encrypted read-only IMAP, presets, custom IMAP | ✅ Done |
 
 ## §13 — Risk register
 

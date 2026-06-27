@@ -118,7 +118,7 @@ const createSettingsWindow = (): BrowserWindow => {
 			contextIsolation: true,
 			nodeIntegration: false,
 			sandbox: true,
-			preload: join(currentDir, '../preload/index.js'),
+			preload: join(currentDir, '../preload/index.cjs'),
 		},
 	})
 	setMainWindowForIpc(window)
@@ -156,7 +156,7 @@ const createPollWindow = (): BrowserWindow => {
 			contextIsolation: true,
 			nodeIntegration: false,
 			sandbox: true,
-			preload: join(currentDir, '../preload/index.js'),
+			preload: join(currentDir, '../preload/index.cjs'),
 		},
 	})
 	setMainWindowForIpc(window)

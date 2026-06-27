@@ -5,6 +5,8 @@ import type {
 	Message,
 	MessageAddress,
 	Provider,
+	ProviderDescriptor,
+	ImapSecurity,
 	Thread,
 } from './models'
 
@@ -35,6 +37,36 @@ export interface GoogleOAuthConfigInput {
 	readonly clientId: string
 	readonly clientSecret: string
 	readonly projectId?: string
+}
+
+export interface OAuthAccountAddRequest {
+	readonly authentication: 'oauth'
+	readonly provider: 'gmail' | 'outlook'
+}
+
+export interface ImapAccountInput {
+	readonly provider: Exclude<Provider, 'gmail' | 'outlook'>
+	readonly email: string
+	readonly username: string
+	readonly password: string
+	readonly host?: string
+	readonly port?: number
+	readonly security?: ImapSecurity
+}
+
+export interface ImapAccountAddRequest extends ImapAccountInput {
+	readonly authentication: 'app-password'
+}
+
+export type AccountAddRequest = OAuthAccountAddRequest | ImapAccountAddRequest
+
+export interface ImapReconnectRequest {
+	readonly authentication: 'app-password'
+	readonly username: string
+	readonly password: string
+	readonly host?: string
+	readonly port?: number
+	readonly security?: ImapSecurity
 }
 
 export interface OtpSource {
@@ -88,9 +120,10 @@ export interface IpcApi {
 	) => Promise<IpcResult<{ path: string }>>
 	'oauth:deleteGoogleConfig': () => Promise<IpcResult<{ deleted: boolean }>>
 	'oauth:cancelFlow': () => Promise<IpcResult<{ canceled: boolean }>>
+	'providers:list': () => Promise<IpcResult<readonly ProviderDescriptor[]>>
 	'accounts:list': () => Promise<IpcResult<Account[]>>
-	'accounts:add': (provider: Provider) => Promise<IpcResult<Account>>
-	'accounts:reconnect': (accountId: string) => Promise<IpcResult<Account>>
+	'accounts:add': (request: AccountAddRequest) => Promise<IpcResult<Account>>
+	'accounts:reconnect': (accountId: string, request?: ImapReconnectRequest) => Promise<IpcResult<Account>>
 	'accounts:remove': (accountId: string) => Promise<IpcResult<void>>
 	'mail:listMessages': (
 		accountId: string,
@@ -144,6 +177,7 @@ export const IPC_CHANNELS = [
 	'oauth:saveGoogleConfig',
 	'oauth:deleteGoogleConfig',
 	'oauth:cancelFlow',
+	'providers:list',
 	'accounts:list',
 	'accounts:add',
 	'accounts:reconnect',

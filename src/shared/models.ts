@@ -1,4 +1,33 @@
-export type Provider = 'gmail' | 'outlook'
+export type Provider = 'gmail' | 'outlook' | 'yahoo' | 'icloud' | 'fastmail' | 'zoho' | 'proton' | 'imap'
+export type ProviderTransport = 'gmail-api' | 'microsoft-graph' | 'imap'
+export type ProviderAuthentication = 'oauth' | 'app-password'
+export type MailboxStyle = 'labels' | 'folders'
+export type ImapSecurity = 'tls' | 'starttls'
+
+export interface ProviderCapabilities {
+	readonly folders: boolean
+	readonly labels: boolean
+	readonly threads: boolean
+	readonly send: boolean
+	readonly mutations: boolean
+}
+
+export interface ImapPreset {
+	readonly host: string
+	readonly port: number
+	readonly security: ImapSecurity
+}
+
+export interface ProviderDescriptor {
+	readonly id: Provider
+	readonly displayName: string
+	readonly transport: ProviderTransport
+	readonly authentication: ProviderAuthentication
+	readonly mailboxStyle: MailboxStyle
+	readonly capabilities: ProviderCapabilities
+	readonly setupInstructions: string
+	readonly imapPreset?: ImapPreset
+}
 
 export interface Account {
 	readonly id: string

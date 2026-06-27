@@ -8,6 +8,7 @@ describe('IPC channel list', () => {
 			'oauth:saveGoogleConfig',
 			'oauth:deleteGoogleConfig',
 			'oauth:cancelFlow',
+			'providers:list',
 			'accounts:list',
 			'accounts:add',
 			'accounts:reconnect',

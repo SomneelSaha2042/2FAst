@@ -1,7 +1,8 @@
 import type { CSSProperties, ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { OtpResult, OtpSettings, PollStartPayload } from '../shared/ipc-api'
-import type { Account, Provider } from '../shared/models'
+import type { AccountAddRequest, ImapReconnectRequest, OtpResult, OtpSettings, PollStartPayload } from '../shared/ipc-api'
+import type { Account, ImapSecurity, Provider, ProviderDescriptor } from '../shared/models'
+import { getProviderDescriptor, isProvider } from '../shared/provider-registry'
 
 const BYOC_GUIDE_URL = 'https://developers.google.com/identity/protocols/oauth2/native-app'
 const GOOGLE_CONSOLE_URL = 'https://console.cloud.google.com/'
@@ -45,7 +46,7 @@ const pollPayloadFromLocation = (): PollStartPayload | null => {
 	const accountId = params.get('accountId')
 	const email = params.get('email')
 	const provider = params.get('provider')
-	if (!accountId || !email || (provider !== 'gmail' && provider !== 'outlook')) {
+	if (!accountId || !email || !isProvider(provider)) {
 		return null
 	}
 	return { accountId, email, provider }
@@ -133,6 +134,7 @@ interface WindowChromeProps {
 
 interface SettingsState {
 	readonly accounts: readonly Account[]
+	readonly providers: readonly ProviderDescriptor[]
 	readonly settings: OtpSettings
 	readonly gmailConfigured: boolean
 }
@@ -140,7 +142,7 @@ interface SettingsState {
 type PollState = 'idle' | 'scanning' | 'complete' | 'error'
 type GmailSaveState = 'idle' | 'saving' | 'saved' | 'error'
 
-const providerLabel = (provider: Provider): string => provider === 'gmail' ? 'Gmail' : 'Outlook'
+const providerLabel = (provider: Provider): string => getProviderDescriptor(provider)?.displayName ?? provider
 
 const shortClientId = (clientId: string): string => {
 	const [prefix] = clientId.split('.')
@@ -216,12 +218,12 @@ function WindowChrome(props: WindowChromeProps): ReactElement {
 	const isPollWindow = props.title === 'OTP Check' || props.title.endsWith(' OTP')
 	return (
 		<main style={shellStyle}>
-			<header style={{ height: 38, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px 0 14px', borderBottom: '1px solid rgba(148, 163, 184, 0.18)', ['-webkit-app-region' as string]: 'drag' }}>
+			<header style={{ height: 38, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px 0 14px', borderBottom: '1px solid rgba(148, 163, 184, 0.18)', ['WebkitAppRegion' as string]: 'drag' }}>
 				<div>
 					<strong style={{ display: 'block', fontSize: 13 }}>2Fast</strong>
 					{props.subtitle ? <span style={{ display: 'block', marginTop: 1, color: '#94a3b8', fontSize: 11 }}>{props.subtitle}</span> : null}
 				</div>
-				<div style={{ display: 'flex', gap: 6, ['-webkit-app-region' as string]: 'no-drag' }}>
+				<div style={{ display: 'flex', gap: 6, ['WebkitAppRegion' as string]: 'no-drag' }}>
 					<button type="button" aria-label="Minimize" style={iconButtonStyle} onClick={() => { const api = getApi(); if (api) void api['window:minimize']() }}>-</button>
 					<button type="button" aria-label="Close" style={iconButtonStyle} onClick={() => { const api = getApi(); if (api) void api['window:hide']() }}>x</button>
 				</div>
@@ -236,6 +238,7 @@ function WindowChrome(props: WindowChromeProps): ReactElement {
 
 const initialSettingsState: SettingsState = {
 	accounts: [],
+	providers: [],
 	settings: DEFAULT_SETTINGS,
 	gmailConfigured: false,
 }
@@ -345,11 +348,26 @@ function SettingsView(): ReactElement {
 	const [clientId, setClientId] = useState<string>('')
 	const [clientSecret, setClientSecret] = useState<string>('')
 	const [projectId, setProjectId] = useState<string>('')
+	const [imapProvider, setImapProvider] = useState<Exclude<Provider, 'gmail' | 'outlook'>>('yahoo')
+	const [imapEmail, setImapEmail] = useState<string>('')
+	const [imapUsername, setImapUsername] = useState<string>('')
+	const [imapPassword, setImapPassword] = useState<string>('')
+	const [imapHost, setImapHost] = useState<string>('')
+	const [imapPort, setImapPort] = useState<string>('993')
+	const [imapSecurity, setImapSecurity] = useState<ImapSecurity>('tls')
 
-	const grouped = useMemo(() => ({
-		gmail: state.accounts.filter((account) => account.provider === 'gmail'),
-		outlook: state.accounts.filter((account) => account.provider === 'outlook'),
-	}), [state.accounts])
+	const grouped = useMemo(() =>
+		state.providers
+			.map((descriptor) => ({
+				descriptor,
+				accounts: state.accounts.filter((account) => account.provider === descriptor.id),
+			}))
+			.filter((group) => group.accounts.length > 0 || group.descriptor.id === 'gmail' || group.descriptor.id === 'outlook'),
+	[state.accounts, state.providers])
+	const imapDescriptors = useMemo(() =>
+		state.providers.filter((descriptor) => descriptor.transport === 'imap'),
+	[state.providers])
+	const selectedImapDescriptor = imapDescriptors.find((descriptor) => descriptor.id === imapProvider)
 
 	const navigateToPage = (nextPage: SettingsPage): void => {
 		setPage(nextPage)
@@ -364,15 +382,18 @@ function SettingsView(): ReactElement {
 			setError('Preload bridge unavailable: window.api is undefined.')
 			return
 		}
-		const [accountsResult, settingsResult, gmailStatusResult] = await Promise.all([
+		const [accountsResult, providersResult, settingsResult, gmailStatusResult] = await Promise.all([
 			api['accounts:list'](),
+			api['providers:list'](),
 			api['settings:get'](),
 			api['oauth:getGoogleConfigStatus'](),
 		])
 		if (!accountsResult.success) setError(accountsResult.error ?? 'Failed to load accounts')
+		if (!providersResult.success) setError(providersResult.error ?? 'Failed to load providers')
 		if (!settingsResult.success) setError(settingsResult.error ?? 'Failed to load settings')
 		setState({
 			accounts: accountsResult.data ?? [],
+			providers: providersResult.data ?? [],
 			settings: settingsResult.data ?? DEFAULT_SETTINGS,
 			gmailConfigured: Boolean(gmailStatusResult.success && gmailStatusResult.data?.configured),
 		})
@@ -404,15 +425,18 @@ function SettingsView(): ReactElement {
 		setStatus('Settings saved.')
 	}
 
-	const addAccount = async (provider: Provider): Promise<void> => {
+	const addAccount = async (request: AccountAddRequest): Promise<void> => {
 		const api = getApi()
 		if (!api) return
+		const provider = request.provider
 		setIsWorking(true)
-		setCanCancelConnection(true)
+		setCanCancelConnection(request.authentication === 'oauth')
 		setError(null)
-		setStatus(`Waiting for ${providerLabel(provider)} sign-in callback...`)
+		setStatus(request.authentication === 'oauth'
+			? `Waiting for ${providerLabel(provider)} sign-in callback...`
+			: `Testing ${providerLabel(provider)} IMAP connection...`)
 		try {
-			const result = await api['accounts:add'](provider)
+			const result = await api['accounts:add'](request)
 			if (!result.success || !result.data) throw new Error(result.error ?? 'Failed to add account')
 			setStatus(`Connected ${result.data.email}`)
 			await refresh()
@@ -427,6 +451,7 @@ function SettingsView(): ReactElement {
 		} finally {
 			setIsWorking(false)
 			setCanCancelConnection(false)
+			if (request.authentication === 'app-password') setImapPassword('')
 		}
 	}
 
@@ -451,7 +476,21 @@ function SettingsView(): ReactElement {
 			navigateToPage('gmail-setup')
 			return
 		}
-		await addAccount('gmail')
+		await addAccount({ authentication: 'oauth', provider: 'gmail' })
+	}
+
+	const addImapAccount = async (): Promise<void> => {
+		const customSettings = imapProvider === 'imap'
+			? { host: imapHost.trim(), port: Number(imapPort), security: imapSecurity }
+			: {}
+		await addAccount({
+			authentication: 'app-password',
+			provider: imapProvider,
+			email: imapEmail.trim(),
+			username: imapUsername.trim(),
+			password: imapPassword,
+			...customSettings,
+		})
 	}
 
 	const removeAccount = async (account: Account): Promise<void> => {
@@ -475,12 +514,21 @@ function SettingsView(): ReactElement {
 	const reconnectAccount = async (account: Account): Promise<void> => {
 		const api = getApi()
 		if (!api) return
+		let reconnectRequest: ImapReconnectRequest | undefined
+		const descriptor = getProviderDescriptor(account.provider)
+		if (descriptor?.transport === 'imap') {
+			const password = window.prompt(`Enter a new app password for ${account.email}:`)
+			if (!password) return
+			const username = window.prompt(`Enter the IMAP username for ${account.email}:`, account.email)
+			if (!username) return
+			reconnectRequest = { authentication: 'app-password', username, password }
+		}
 		setIsWorking(true)
-		setCanCancelConnection(true)
+		setCanCancelConnection(descriptor?.authentication === 'oauth')
 		setError(null)
 		setStatus(`Reconnecting ${account.email}...`)
 		try {
-			const result = await api['accounts:reconnect'](account.id)
+			const result = await api['accounts:reconnect'](account.id, reconnectRequest)
 			if (!result.success || !result.data) throw new Error(result.error ?? 'Failed to reconnect account')
 			setStatus(`Reconnected ${result.data.email}.`)
 			await refresh()
@@ -543,8 +591,9 @@ function SettingsView(): ReactElement {
 				{page === 'settings' ? (
 					<>
 						<div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
-							<ProviderAccounts title="Gmail" accounts={grouped.gmail} onReconnectAccount={reconnectAccount} onRemoveAccount={removeAccount} />
-							<ProviderAccounts title="Outlook" accounts={grouped.outlook} onReconnectAccount={reconnectAccount} onRemoveAccount={removeAccount} />
+							{grouped.map((group) => (
+								<ProviderAccounts key={group.descriptor.id} title={group.descriptor.displayName} accounts={group.accounts} onReconnectAccount={reconnectAccount} onRemoveAccount={removeAccount} />
+							))}
 						</div>
 
 						<section style={panelStyle}>
@@ -553,10 +602,39 @@ function SettingsView(): ReactElement {
 								<button type="button" style={primaryButtonStyle} disabled={isWorking} onClick={() => void addGmailAccount()}>
 									Add Gmail
 								</button>
-								<button type="button" style={buttonStyle} disabled={isWorking} onClick={() => void addAccount('outlook')}>
+								<button type="button" style={buttonStyle} disabled={isWorking} onClick={() => void addAccount({ authentication: 'oauth', provider: 'outlook' })}>
 									Add Outlook
 								</button>
 							</div>
+						</section>
+
+						<section style={panelStyle}>
+							<h2 style={{ margin: '0 0 8px', fontSize: 17 }}>Add IMAP Account</h2>
+							<p style={{ margin: '0 0 12px', color: '#94a3b8', lineHeight: 1.5 }}>
+								Read-only IMAP accounts support OTP polling and message access. Use an app-specific password, never your primary account password.
+							</p>
+							<div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+								<label>Provider<select style={inputStyle} value={imapProvider} onChange={(event) => setImapProvider(event.target.value as Exclude<Provider, 'gmail' | 'outlook'>)}>
+									{imapDescriptors.map((descriptor) => <option key={descriptor.id} value={descriptor.id}>{descriptor.displayName}</option>)}
+								</select></label>
+								<label>Email<input type="email" style={inputStyle} value={imapEmail} onChange={(event) => { setImapEmail(event.target.value); if (!imapUsername) setImapUsername(event.target.value) }} /></label>
+								<label>IMAP username<input style={inputStyle} value={imapUsername} onChange={(event) => setImapUsername(event.target.value)} /></label>
+								<label>App password<input type="password" autoComplete="new-password" style={inputStyle} value={imapPassword} onChange={(event) => setImapPassword(event.target.value)} /></label>
+								{imapProvider === 'imap' ? (
+									<>
+										<label>IMAP host<input style={inputStyle} value={imapHost} onChange={(event) => setImapHost(event.target.value)} /></label>
+										<label>Port<input type="number" min="1" max="65535" style={inputStyle} value={imapPort} onChange={(event) => setImapPort(event.target.value)} /></label>
+										<label>Encryption<select style={inputStyle} value={imapSecurity} onChange={(event) => setImapSecurity(event.target.value as ImapSecurity)}>
+											<option value="tls">TLS</option>
+											<option value="starttls">STARTTLS</option>
+										</select></label>
+									</>
+								) : null}
+							</div>
+							<p style={{ margin: '12px 0', color: '#cbd5e1', fontSize: 13 }}>{selectedImapDescriptor?.setupInstructions}</p>
+							<button type="button" style={primaryButtonStyle} disabled={isWorking || !imapEmail.trim() || !imapUsername.trim() || !imapPassword} onClick={() => void addImapAccount()}>
+								Test and Connect
+							</button>
 						</section>
 
 						<div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
