@@ -1,7 +1,7 @@
 # 2Fast
 
 <p align="center">
-  <img src="assets/2fast-pixel-icon-pack/assets/app/app-icon-main.png" alt="2Fast App Icon" width="128" style="image-rendering: pixelated;" />
+  <img src="assets/2fast-pixel-icon-pack/assets/app/app-icon-main.png" alt="2Fast App Icon" width="240" style="image-rendering: pixelated;" />
 </p>
 
 [![CI](https://github.com/SomneelSaha2042/2FAst/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SomneelSaha2042/2FAst/actions/workflows/ci.yml)
