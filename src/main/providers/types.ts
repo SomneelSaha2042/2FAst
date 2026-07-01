@@ -27,4 +27,5 @@ export interface MailProvider {
 	trashMessage?(messageId: string): Promise<void>
 	toggleRead?(messageId: string, isRead: boolean): Promise<void>
 	toggleStar?(messageId: string, isStarred: boolean): Promise<void>
+	dispose?(): Promise<void>
 }

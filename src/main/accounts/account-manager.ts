@@ -27,6 +27,7 @@ export class AccountManager {
 	private readonly store = new Store<AccountStoreShape>({ name: 'accounts', defaults: defaultStore })
 	private googleConfig: GoogleOAuthConfig | null = null
 	private readonly connectors = new Map<Provider, AccountConnector>()
+	private readonly providerCache = new Map<string, MailProvider>()
 
 	constructor() {
 		this.registerConnector({
@@ -96,6 +97,11 @@ export class AccountManager {
 
 	/** Removes an account record and its encrypted token file. @param id Account identifier. @returns Promise that resolves once metadata and tokens are deleted. */
 	async removeAccount(id: string): Promise<void> {
+		const cached = this.providerCache.get(id)
+		if (cached?.dispose) {
+			await cached.dispose().catch(() => {})
+		}
+		this.providerCache.delete(id)
 		await Promise.all([deleteTokens(id), deleteImapCredentials(id)])
 		this.writeAccounts(this.readAccounts().filter((account) => account.id !== id))
 	}
@@ -109,14 +115,25 @@ export class AccountManager {
 	async reconnectAccount(id: string, request?: ImapReconnectRequest): Promise<Account> {
 		const account = this.getAccount(id)
 		if (!account) throw new Error(`Account not found: ${id}`)
+		const cached = this.providerCache.get(id)
+		if (cached?.dispose) {
+			await cached.dispose().catch(() => {})
+		}
+		this.providerCache.delete(id)
 		return this.getConnector(account.provider).reconnect(account, request)
 	}
 
 	/** Resolves an authenticated provider implementation for an account. @param accountId Internal account identifier. @returns Mail provider bound to account credentials. */
 	async getProvider(accountId: string): Promise<MailProvider> {
+		const cached = this.providerCache.get(accountId)
+		if (cached) {
+			return cached
+		}
 		const account = this.getAccount(accountId)
 		if (!account) throw new Error(`Account not found: ${accountId}`)
-		return this.getConnector(account.provider).getProvider(account)
+		const provider = await this.getConnector(account.provider).getProvider(account)
+		this.providerCache.set(accountId, provider)
+		return provider
 	}
 
 	private registerConnector(connector: AccountConnector): void {
