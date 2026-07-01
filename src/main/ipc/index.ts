@@ -69,6 +69,17 @@ export const setMainWindowForIpc = (window: BrowserWindow): void => {
 	mainWindow = window
 }
 
+let onOpenSettingsCallback: (() => void) | null = null
+
+/**
+ * Injects the open settings window callback.
+ * @param callback Callback function.
+ * @returns Void.
+ */
+export const setOnOpenSettings = (callback: () => void): void => {
+	onOpenSettingsCallback = callback
+}
+
 const registerIpcHandlers = (): void => {
 	ipcMain.handle('oauth:getGoogleConfigStatus', async (): Promise<IpcResult<{ configured: boolean }>> => {
 		try { return { success: true, data: { configured: hasValidGoogleOAuthConfig() } } } catch (error) { return formatError(error) }
@@ -196,6 +207,14 @@ const registerIpcHandlers = (): void => {
 	})
 	ipcMain.handle('window:minimize', async (event): Promise<IpcResult<void>> => {
 		try { (BrowserWindow.fromWebContents(event.sender) ?? mainWindow)?.minimize(); return { success: true } } catch (error) { return formatError(error) }
+	})
+	ipcMain.handle('window:openSettings', async (): Promise<IpcResult<void>> => {
+		try {
+			if (onOpenSettingsCallback) {
+				onOpenSettingsCallback()
+			}
+			return { success: true }
+		} catch (error) { return formatError(error) }
 	})
 
 	const unimplementedChannels: readonly { readonly channel: keyof IpcApi; readonly capability: keyof ProviderCapabilities }[] = [

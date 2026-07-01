@@ -1039,7 +1039,25 @@ function PollView(): ReactElement {
 						</div>
 					</div>
 				) : null}
-				{scanState === 'error' ? <div style={panelStyle}><p style={{ margin: 0, color: '#fca5a5', fontWeight: 700 }}>{error ?? 'Something went wrong.'}</p></div> : null}
+				{scanState === 'error' ? (
+					<div style={{ display: 'grid', gap: 8 }}>
+						<div style={panelStyle}>
+							<p style={{ margin: 0, color: '#fca5a5', fontWeight: 700 }}>{error ?? 'Something went wrong.'}</p>
+						</div>
+						{(error?.toLowerCase().includes('reconnect') || error?.toLowerCase().includes('expired')) ? (
+							<button
+								type="button"
+								style={primaryButtonStyle}
+								onClick={() => {
+									const api = getApi()
+									if (api) void api['window:openSettings']()
+								}}
+							>
+								Open Settings to Reconnect
+							</button>
+						) : null}
+					</div>
+				) : null}
 				<div style={{ ...panelStyle, padding: 12 }}>
 					<p style={{ margin: '0 0 8px', color: '#cbd5e1', fontSize: 13, fontWeight: 700 }}>Latest 5 Scan</p>
 					{candidates.length === 0 ? <p style={{ margin: 0, color: '#94a3b8', fontSize: 12 }}>Code candidates will appear here after the scan.</p> : (

@@ -40,6 +40,7 @@ const api: { [K in keyof IpcApi]: IpcApi[K] } = {
 	'settings:update': (settings) => ipcRenderer.invoke('settings:update', settings),
 	'window:hide': () => ipcRenderer.invoke('window:hide'),
 	'window:minimize': () => ipcRenderer.invoke('window:minimize'),
+	'window:openSettings': () => ipcRenderer.invoke('window:openSettings'),
 }
 
 const events: EventApi = {

@@ -2,7 +2,7 @@ import { app, BrowserWindow, Menu } from 'electron'
 import Store from 'electron-store'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { setMainWindowForIpc, setOtpPollService } from './ipc/index.js'
+import { setMainWindowForIpc, setOtpPollService, setOnOpenSettings } from './ipc/index.js'
 import { loadGoogleOAuthConfig } from './oauth/google-config.js'
 import { OtpPollService } from './otp/poll-service.js'
 import { TrayController } from './tray.js'
@@ -231,6 +231,8 @@ app.whenReady().then(() => {
 			app.quit()
 		},
 	})
+
+	setOnOpenSettings(openSettingsWindow)
 
 	const settings = getOtpSettings()
 	setAutoLaunch(settings.launchOnStartup)

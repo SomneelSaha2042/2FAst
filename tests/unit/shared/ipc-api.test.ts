@@ -35,6 +35,7 @@ describe('IPC channel list', () => {
 			'settings:update',
 			'window:hide',
 			'window:minimize',
+			'window:openSettings',
 		]
 
 		expect(IPC_CHANNELS).toEqual(expected)

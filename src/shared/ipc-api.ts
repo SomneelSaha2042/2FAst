@@ -170,6 +170,7 @@ export interface IpcApi {
 	'settings:update': (settings: Partial<OtpSettings>) => Promise<IpcResult<OtpSettings>>
 	'window:hide': () => Promise<IpcResult<void>>
 	'window:minimize': () => Promise<IpcResult<void>>
+	'window:openSettings': () => Promise<IpcResult<void>>
 }
 
 export const IPC_CHANNELS = [
@@ -204,4 +205,5 @@ export const IPC_CHANNELS = [
 	'settings:update',
 	'window:hide',
 	'window:minimize',
+	'window:openSettings',
 ] as const satisfies readonly (keyof IpcApi)[]
