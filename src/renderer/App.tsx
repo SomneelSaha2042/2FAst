@@ -590,6 +590,144 @@ function SettingsView(): ReactElement {
 			<div style={{ display: 'grid', gap: 16 }}>
 				{page === 'settings' ? (
 					<>
+						{state.accounts.length === 0 ? (
+							<>
+								<div style={{
+									background: 'rgba(2, 6, 23, 0.42)',
+									border: '1px solid rgba(148, 163, 184, 0.14)',
+									borderRadius: 16,
+									padding: '24px 20px',
+									display: 'grid',
+									gridTemplateColumns: '80px 1fr',
+									gap: 20,
+									alignItems: 'center',
+								}}>
+									<img
+										src="icons/mascot/mascot-notification.png"
+										alt="2Fast mascot"
+										style={{
+											width: 80,
+											height: 80,
+											objectFit: 'contain',
+											imageRendering: 'pixelated'
+										}}
+									/>
+									<div>
+										<h2 style={{ margin: '0 0 6px', fontSize: 18, color: '#f8fafc' }}>Welcome to 2Fast!</h2>
+										<p style={{ margin: 0, color: '#94a3b8', fontSize: 13, lineHeight: 1.5 }}>
+											2Fast is a tray-first desktop utility that retrieves OTP-style verification codes from your recent emails so you can copy them instantly. Get started by connecting a Gmail or Outlook account below.
+										</p>
+									</div>
+								</div>
+
+								<div style={{
+									display: 'grid',
+									gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+									gap: 12,
+								}}>
+									<div style={{
+										background: 'rgba(2, 6, 23, 0.3)',
+										border: '1px solid rgba(148, 163, 184, 0.1)',
+										borderRadius: 12,
+										padding: 16,
+										textAlign: 'center',
+										display: 'flex',
+										flexDirection: 'column',
+										alignItems: 'center'
+									}}>
+										<img
+											src="icons/features/feature-fast-delivery.png"
+											alt="Fast scanning"
+											style={{
+												width: 48,
+												height: 48,
+												objectFit: 'contain',
+												imageRendering: 'pixelated',
+												marginBottom: 10
+											}}
+										/>
+										<strong style={{ display: 'block', fontSize: 14, color: '#e2e8f0', marginBottom: 4 }}>Fast Retrieval</strong>
+										<span style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.4 }}>Rapid on-demand scans and auto-copy of codes to clipboard.</span>
+									</div>
+
+									<div style={{
+										background: 'rgba(2, 6, 23, 0.3)',
+										border: '1px solid rgba(148, 163, 184, 0.1)',
+										borderRadius: 12,
+										padding: 16,
+										textAlign: 'center',
+										display: 'flex',
+										flexDirection: 'column',
+										alignItems: 'center'
+									}}>
+										<img
+											src="icons/features/feature-otp-codes.png"
+											alt="OTP extraction"
+											style={{
+												width: 48,
+												height: 48,
+												objectFit: 'contain',
+												imageRendering: 'pixelated',
+												marginBottom: 10
+											}}
+										/>
+										<strong style={{ display: 'block', fontSize: 14, color: '#e2e8f0', marginBottom: 4 }}>Smart Extraction</strong>
+										<span style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.4 }}>Detects one-time passwords from the newest incoming emails.</span>
+									</div>
+
+									<div style={{
+										background: 'rgba(2, 6, 23, 0.3)',
+										border: '1px solid rgba(148, 163, 184, 0.1)',
+										borderRadius: 12,
+										padding: 16,
+										textAlign: 'center',
+										display: 'flex',
+										flexDirection: 'column',
+										alignItems: 'center'
+									}}>
+										<img
+											src="icons/features/feature-secure.png"
+											alt="Secure connection"
+											style={{
+												width: 48,
+												height: 48,
+												objectFit: 'contain',
+												imageRendering: 'pixelated',
+												marginBottom: 10
+											}}
+										/>
+										<strong style={{ display: 'block', fontSize: 14, color: '#e2e8f0', marginBottom: 4 }}>Scoped Security</strong>
+										<span style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.4 }}>Secure token handling & strictly sandboxed access boundaries.</span>
+									</div>
+
+									<div style={{
+										background: 'rgba(2, 6, 23, 0.3)',
+										border: '1px solid rgba(148, 163, 184, 0.1)',
+										borderRadius: 12,
+										padding: 16,
+										textAlign: 'center',
+										display: 'flex',
+										flexDirection: 'column',
+										alignItems: 'center'
+									}}>
+										<img
+											src="icons/features/feature-private.png"
+											alt="Private processing"
+											style={{
+												width: 48,
+												height: 48,
+												objectFit: 'contain',
+												imageRendering: 'pixelated',
+												marginBottom: 10
+											}}
+										/>
+										<strong style={{ display: 'block', fontSize: 14, color: '#e2e8f0', marginBottom: 4 }}>Local Privacy</strong>
+										<span style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.4 }}>All extraction occurs locally with short-lived history and redacted logs.</span>
+									</div>
+								</div>
+							</>
+						) : null}
+
 						<div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
 							{grouped.map((group) => (
 								<ProviderAccounts key={group.descriptor.id} title={group.descriptor.displayName} accounts={group.accounts} onReconnectAccount={reconnectAccount} onRemoveAccount={removeAccount} />
@@ -745,6 +883,31 @@ function SettingsView(): ReactElement {
 								<label><input type="checkbox" checked={state.settings.launchOnStartup} onChange={(event) => void updateSettings({ launchOnStartup: event.target.checked })} /> Launch on startup</label>
 							</div>
 						</section>
+						<section style={{
+							...panelStyle,
+							marginTop: 12,
+							display: 'grid',
+							gridTemplateColumns: '40px 1fr',
+							gap: 14,
+							alignItems: 'center'
+						}}>
+							<img
+								src="icons/features/feature-cross-platform.png"
+								alt="Desktop compatibility badge"
+								style={{
+									width: 40,
+									height: 40,
+									objectFit: 'contain',
+									imageRendering: 'pixelated'
+								}}
+							/>
+							<div>
+								<strong style={{ display: 'block', fontSize: 13, color: '#f8fafc' }}>Desktop Compatibility</strong>
+								<span style={{ color: '#94a3b8', fontSize: 11, lineHeight: 1.45 }}>
+									2Fast runs in your system tray on Windows, Linux, and macOS.
+								</span>
+							</div>
+						</section>
 					</>
 				) : null}
 
@@ -844,7 +1007,19 @@ function PollView(): ReactElement {
 	return (
 		<WindowChrome title={title} subtitle={target?.email}>
 			<div style={{ display: 'grid', gap: 9 }}>
-				{scanState === 'idle' ? <p style={{ margin: 0, color: '#cbd5e1' }}>Waiting for account selection.</p> : null}
+				{scanState === 'idle' ? (
+					<div style={{ ...panelStyle, display: 'grid', gridTemplateColumns: '48px 1fr', gap: 12, alignItems: 'center' }}>
+						<img
+							src="icons/mascot/mascot-notification.png"
+							alt="2Fast mascot waiting"
+							style={{ width: 48, height: 48, objectFit: 'contain', imageRendering: 'pixelated' }}
+						/>
+						<div>
+							<p style={{ margin: 0, color: '#cbd5e1', fontWeight: 700 }}>Ready to scan</p>
+							<p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: 12 }}>Waiting for account selection.</p>
+						</div>
+					</div>
+				) : null}
 				{scanState === 'scanning' ? (
 					<div style={panelStyle}>
 						<p style={{ margin: 0, color: '#e0f2fe', fontWeight: 700 }}>Inspecting latest emails...</p>
@@ -852,9 +1027,16 @@ function PollView(): ReactElement {
 					</div>
 				) : null}
 				{scanState === 'complete' && candidates.length === 0 ? (
-					<div style={panelStyle}>
-						<p style={{ margin: 0, color: '#fde68a', fontWeight: 700 }}>No code-like emails found.</p>
-						<p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: 12 }}>The latest 5 messages did not match the OTP detector.</p>
+					<div style={{ ...panelStyle, display: 'grid', gridTemplateColumns: '48px 1fr', gap: 12, alignItems: 'center' }}>
+						<img
+							src="icons/mascot/mascot-notification.png"
+							alt="2Fast mascot empty state"
+							style={{ width: 48, height: 48, objectFit: 'contain', imageRendering: 'pixelated' }}
+						/>
+						<div>
+							<p style={{ margin: 0, color: '#fde68a', fontWeight: 700 }}>No code-like emails found.</p>
+							<p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: 12 }}>The latest 5 messages did not match the OTP detector.</p>
+						</div>
 					</div>
 				) : null}
 				{scanState === 'error' ? <div style={panelStyle}><p style={{ margin: 0, color: '#fca5a5', fontWeight: 700 }}>{error ?? 'Something went wrong.'}</p></div> : null}

@@ -23,6 +23,7 @@ extraResources:
       - icon.ico
       - icon.icns
       - tray-icon*.png
+      - icons/**/*
 
 mac:
   target:
@@ -38,7 +39,7 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  icon: resources/icon.ico
+  icon: resources/icons/app/app-icon-main.ico
   executableName: 2Fast
   signAndEditExecutable: false
 
@@ -46,12 +47,12 @@ linux:
   target:
     - target: AppImage
       arch: [x64]
-  icon: resources/icon.png
+  icon: resources/icons/app/app-icon-main.png
   category: Utility
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  installerIcon: resources/icon.ico
-  uninstallerIcon: resources/icon.ico
-  installerHeaderIcon: resources/icon.ico
+  installerIcon: resources/icons/app/app-icon-main.ico
+  uninstallerIcon: resources/icons/app/app-icon-main.ico
+  installerHeaderIcon: resources/icons/app/app-icon-main.ico

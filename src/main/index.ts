@@ -62,13 +62,19 @@ const otpPollService = new OtpPollService({
 		pollWindow?.webContents.send('poll:status', status)
 		tray?.refreshMenu()
 	},
+	onScanStarted: () => {
+		tray?.onScanStarted()
+	},
+	onScanFinished: () => {
+		tray?.onScanFinished()
+	},
 })
 
 setOtpPollService(otpPollService)
 
 const rendererPath = (): string => join(app.getAppPath(), 'dist/renderer/index.html')
 const resourcesPath = (): string => app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
-const appIconPath = (): string => join(resourcesPath(), process.platform === 'win32' ? 'icon.ico' : 'icon.png')
+const appIconPath = (): string => join(resourcesPath(), process.platform === 'win32' ? 'icons/app/app-icon-main.ico' : 'icons/app/app-icon-main.png')
 
 const loadRendererView = async (
 	window: BrowserWindow,

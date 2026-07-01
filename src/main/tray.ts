@@ -91,11 +91,12 @@ export class TrayController {
 	private highlightTimer: NodeJS.Timeout | null = null
 	private readonly normalIcon
 	private readonly activeIcon
+	private scanCount = 0
 
 	constructor(context: TrayContext) {
 		this.context = context
-		this.normalIcon = this.loadIcon(process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'tray-icon.png')
-		this.activeIcon = this.loadIcon(process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'tray-icon-active.png')
+		this.normalIcon = this.loadIcon(process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'icons/tray/tray-icon-idle.png')
+		this.activeIcon = this.loadIcon(process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'icons/tray/tray-icon-active.png')
 		this.tray = new Tray(this.normalIcon)
 		this.tray.setToolTip('2Fast')
 		this.tray.on('click', () => {
@@ -105,14 +106,28 @@ export class TrayController {
 		this.refreshMenu()
 	}
 
+	onScanStarted(): void {
+		this.scanCount++
+		this.tray.setImage(this.activeIcon)
+	}
+
+	onScanFinished(): void {
+		this.scanCount = Math.max(0, this.scanCount - 1)
+		if (this.scanCount === 0 && !this.highlightTimer) {
+			this.tray.setImage(this.normalIcon)
+		}
+	}
+
 	onOtpDetected(): void {
 		this.tray.setImage(this.activeIcon)
 		if (this.highlightTimer) {
 			clearTimeout(this.highlightTimer)
 		}
 		this.highlightTimer = setTimeout(() => {
-			this.tray.setImage(this.normalIcon)
 			this.highlightTimer = null
+			if (this.scanCount === 0) {
+				this.tray.setImage(this.normalIcon)
+			}
 		}, 5_000)
 		this.refreshMenu()
 	}

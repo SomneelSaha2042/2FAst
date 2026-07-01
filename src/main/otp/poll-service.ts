@@ -52,6 +52,8 @@ export class OtpPollService {
 	private readonly onOtpDetected: (otp: StoredOtp) => void
 	private readonly onOtpExpired: (otpId: string) => void
 	private readonly onPollStatus: (status: PollStatus) => void
+	private readonly onScanStarted: () => void
+	private readonly onScanFinished: () => void
 	private readonly debugLoggingEnabled: boolean
 	private readonly logDirectory?: LogDirectoryProvider
 
@@ -60,6 +62,8 @@ export class OtpPollService {
 		readonly onOtpDetected?: (otp: StoredOtp) => void
 		readonly onOtpExpired?: (otpId: string) => void
 		readonly onPollStatus?: (status: PollStatus) => void
+		readonly onScanStarted?: () => void
+		readonly onScanFinished?: () => void
 		readonly debugLoggingEnabled?: boolean
 		readonly logDirectory?: LogDirectoryProvider
 	}) {
@@ -76,6 +80,8 @@ export class OtpPollService {
 		this.onOtpDetected = options?.onOtpDetected ?? (() => {})
 		this.onOtpExpired = options?.onOtpExpired ?? (() => {})
 		this.onPollStatus = options?.onPollStatus ?? (() => {})
+		this.onScanStarted = options?.onScanStarted ?? (() => {})
+		this.onScanFinished = options?.onScanFinished ?? (() => {})
 		this.debugLoggingEnabled = options?.debugLoggingEnabled ?? isPollDebugLoggingEnabled()
 		this.logDirectory = options?.logDirectory
 	}
@@ -174,7 +180,14 @@ export class OtpPollService {
 			return
 		}
 		const accounts = accountManager.listAccounts()
-		await Promise.all(accounts.map((account) => this.pollAccount(account)))
+		if (accounts.length > 0) {
+			this.onScanStarted()
+			try {
+				await Promise.all(accounts.map((account) => this.pollAccount(account)))
+			} finally {
+				this.onScanFinished()
+			}
+		}
 		this.persistSeenIds()
 	}
 
@@ -194,7 +207,12 @@ export class OtpPollService {
 		if (!account) {
 			throw new Error(`Account not found: ${accountId}`)
 		}
-		await this.pollAccount(account, { includeSeen: true })
+		this.onScanStarted()
+		try {
+			await this.pollAccount(account, { includeSeen: true })
+		} finally {
+			this.onScanFinished()
+		}
 		this.persistSeenIds()
 	}
 
@@ -208,40 +226,45 @@ export class OtpPollService {
 		if (!account) {
 			throw new Error(`Account not found: ${accountId}`)
 		}
-		await this.writePollLog(
-			`[${new Date().toISOString()}] scan:start accountId=${account.id} email=${account.email} provider=${account.provider}`
-		)
-		const provider = await accountManager.getProvider(account.id)
-		const listResult = await provider.listMessages({
-			maxResults: this.config.maxEmailsPerPoll,
-		})
-		await this.writePollLog(
-			`[${new Date().toISOString()}] scan:list accountId=${account.id} count=${listResult.messages.length} maxResults=${this.config.maxEmailsPerPoll}`
-		)
+		this.onScanStarted()
+		try {
+			await this.writePollLog(
+				`[${new Date().toISOString()}] scan:start accountId=${account.id} email=${account.email} provider=${account.provider}`
+			)
+			const provider = await accountManager.getProvider(account.id)
+			const listResult = await provider.listMessages({
+				maxResults: this.config.maxEmailsPerPoll,
+			})
+			await this.writePollLog(
+				`[${new Date().toISOString()}] scan:list accountId=${account.id} count=${listResult.messages.length} maxResults=${this.config.maxEmailsPerPoll}`
+			)
 
-		const results: OtpResult[] = []
-		for (const item of listResult.messages) {
-			await this.writePollLog(
-				`[${new Date().toISOString()}] scan:item accountId=${account.id} messageId=${item.id} date=${item.date} from=${item.from.email} subjectLength=${item.subject.length}`
-			)
-			const message = await provider.getMessage(item.id)
-			const extracted = extractOtp(message.subject, message.bodyText ?? '', message.bodyHtml ?? '')
-			if (!extracted) {
+			const results: OtpResult[] = []
+			for (const item of listResult.messages) {
 				await this.writePollLog(
-					`[${new Date().toISOString()}] scan:no-otp accountId=${account.id} messageId=${message.id}`
+					`[${new Date().toISOString()}] scan:item accountId=${account.id} messageId=${item.id} date=${item.date} from=${item.from.email} subjectLength=${item.subject.length}`
 				)
-				continue
+				const message = await provider.getMessage(item.id)
+				const extracted = extractOtp(message.subject, message.bodyText ?? '', message.bodyHtml ?? '')
+				if (!extracted) {
+					await this.writePollLog(
+						`[${new Date().toISOString()}] scan:no-otp accountId=${account.id} messageId=${message.id}`
+					)
+					continue
+				}
+				const result: OtpResult = {
+					...extracted,
+					source: buildOtpSource(message),
+				}
+				results.push(result)
+				await this.writePollLog(
+					`[${new Date().toISOString()}] scan:otp-candidate accountId=${account.id} messageId=${message.id} code=${result.code} type=${result.type} confidence=${result.confidence}`
+				)
 			}
-			const result: OtpResult = {
-				...extracted,
-				source: buildOtpSource(message),
-			}
-			results.push(result)
-			await this.writePollLog(
-				`[${new Date().toISOString()}] scan:otp-candidate accountId=${account.id} messageId=${message.id} code=${result.code} type=${result.type} confidence=${result.confidence}`
-			)
+			return results
+		} finally {
+			this.onScanFinished()
 		}
-		return results
 	}
 
 	private async pollAccount(account: Account, options?: { readonly includeSeen?: boolean }): Promise<void> {
