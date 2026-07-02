@@ -1,9 +1,162 @@
 @import "tailwindcss";
 
+@theme {
+  --color-inverse-on-surface: #233143;
+  --color-on-primary: #00315d;
+  --color-surface-container-highest: #273647;
+  --color-outline: #8b919d;
+  --color-tertiary-container: #d19900;
+  --color-surface-variant: #273647;
+  --color-background: #051424;
+  --color-on-secondary-container: #aeb9d0;
+  --color-on-secondary-fixed: #111c2d;
+  --color-on-secondary-fixed-variant: #3c475a;
+  --color-surface-bright: #2c3a4c;
+  --color-on-primary-fixed: #001c39;
+  --color-on-tertiary-fixed: #261900;
+  --color-on-surface-variant: #c1c7d3;
+  --color-on-tertiary-fixed-variant: #5d4200;
+  --color-outline-variant: #414751;
+  --color-inverse-surface: #d4e4fa;
+  --color-primary-fixed-dim: #a4c9ff;
+  --color-surface: #051424;
+  --color-tertiary-fixed: #ffdea4;
+  --color-primary-container: #60a5fa;
+  --color-on-primary-fixed-variant: #004883;
+  --color-error-container: #93000a;
+  --color-on-secondary: #263143;
+  --color-inverse-primary: #0060ac;
+  --color-surface-container-lowest: #010f1f;
+  --color-on-background: #d4e4fa;
+  --color-primary: #a4c9ff;
+  --color-on-error-container: #ffdad6;
+  --color-on-primary-container: #003a6b;
+  --color-surface-container: #122131;
+  --color-surface-container-high: #1c2b3c;
+  --color-on-tertiary: #412d00;
+  --color-secondary-fixed: #d8e3fb;
+  --color-on-tertiary-container: #4b3500;
+  --color-surface-tint: #a4c9ff;
+  --color-on-surface: #d4e4fa;
+  --color-surface-container-low: #0d1c2d;
+  --color-surface-dim: #051424;
+  --color-primary-fixed: #d4e3ff;
+  --color-error: #ffb4ab;
+  --color-secondary-fixed-dim: #bcc7de;
+  --color-secondary-container: #3e495d;
+  --color-tertiary-fixed-dim: #fabd34;
+  --color-secondary: #bcc7de;
+  --color-on-error: #690005;
+  --color-tertiary: #fabd34;
+
+  --spacing-card-padding: 1.25rem;
+  --spacing-stack-gap: 1rem;
+  --spacing-input-gap: 0.5rem;
+  --spacing-window-padding: 1.5rem;
+  --spacing-tray-width: 380px;
+
+  --font-headline-md: 'Inter', system-ui, sans-serif;
+  --font-headline-sm: 'Inter', system-ui, sans-serif;
+  --font-body-base: 'Inter', system-ui, sans-serif;
+  --font-body-sm: 'Inter', system-ui, sans-serif;
+  --font-code-otp: 'Inter', system-ui, sans-serif;
+  --font-label-caps: 'Inter', system-ui, sans-serif;
+  --font-title-bar: 'Inter', system-ui, sans-serif;
+}
+
 html,
 body,
 #root {
   margin: 0;
   min-height: 100%;
   background: transparent;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(5, 20, 36, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(164, 201, 255, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(164, 201, 255, 0.4);
+}
+
+/* Glassmorphic Styles */
+.glass-window {
+  background: rgba(6, 10, 20, 0.82);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.38);
+  box-sizing: border-box;
+}
+
+.glass-panel {
+  background: rgba(18, 33, 49, 0.82);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(65, 71, 81, 0.15);
+  box-shadow: inset 0 0 10px rgba(164, 201, 255, 0.05);
+}
+
+.neon-border-hover:hover {
+  border-color: rgba(164, 201, 255, 0.5);
+  box-shadow: 0 0 15px rgba(164, 201, 255, 0.1);
+}
+
+/* Custom styles for checkboxes as sliders */
+.custom-toggle {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.custom-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #273647;
+  transition: .3s;
+  border-radius: 20px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #8b919d;
+  transition: .3s;
+  border-radius: 50%;
+}
+input:checked + .slider {
+  background-color: #60a5fa;
+  box-shadow: 0 0 8px rgba(96, 165, 250, 0.5);
+}
+input:checked + .slider:before {
+  transform: translateX(16px);
+  background-color: white;
+}
+
+/* Material Icons configuration */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+  user-select: none;
 }
