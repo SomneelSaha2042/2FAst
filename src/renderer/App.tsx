@@ -116,6 +116,7 @@ function WindowChrome(props: WindowChromeProps): ReactElement {
 			{/* TopAppBar (Custom Title Bar) */}
 			<header className="fixed top-0 w-full h-8 flex items-center justify-between px-4 bg-surface/80 backdrop-blur-xl border-b border-outline-variant/15 z-50 select-none" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
 				<div className="flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+					<img src="/icon.png" alt="2Fast Logo" className="w-4 h-4 object-contain" />
 					<span className="font-bold text-primary tracking-wide text-sm">2Fast</span>
 					<span className="text-[10px] text-outline ml-3 uppercase tracking-widest font-semibold opacity-60">
 						{isPollWindow ? `${props.title} • ${props.subtitle || ''}` : `${props.title}`}

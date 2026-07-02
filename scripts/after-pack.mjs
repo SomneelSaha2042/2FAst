@@ -81,7 +81,7 @@ export default async function afterPack(context) {
 	}
 
 	const exePath = join(context.appOutDir, '2Fast.exe')
-	const iconPath = resolve('resources/icon.ico')
+	const iconPath = resolve('assets/icon.ico')
 	const rceditPath = await findRcedit()
 	await runRcedit(rceditPath, exePath, iconPath)
 }

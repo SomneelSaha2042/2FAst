@@ -73,8 +73,8 @@ const otpPollService = new OtpPollService({
 setOtpPollService(otpPollService)
 
 const rendererPath = (): string => join(app.getAppPath(), 'dist/renderer/index.html')
-const resourcesPath = (): string => app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
-const appIconPath = (): string => join(resourcesPath(), process.platform === 'win32' ? 'icons/app/app-icon-main.ico' : 'icons/app/app-icon-main.png')
+const assetsPath = (): string => app.isPackaged ? join(process.resourcesPath, 'assets') : join(app.getAppPath(), 'assets')
+const appIconPath = (): string => join(assetsPath(), process.platform === 'win32' ? 'icon.ico' : 'icon.png')
 
 const loadRendererView = async (
 	window: BrowserWindow,

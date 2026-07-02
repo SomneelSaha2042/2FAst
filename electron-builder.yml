@@ -18,18 +18,19 @@ files:
 extraResources:
   - from: resources
     to: .
+  - from: assets
+    to: assets
     filter:
       - icon.png
       - icon.ico
       - icon.icns
       - tray-icon*.png
-      - icons/**/*
 
 mac:
   target:
     - target: dmg
       arch: [x64, arm64]
-  icon: resources/icon.icns
+  icon: assets/icon.icns
   category: public.app-category.utilities
   hardenedRuntime: true
   entitlements: resources/entitlements.mac.plist
@@ -39,7 +40,7 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  icon: resources/icons/app/app-icon-main.ico
+  icon: assets/icon.ico
   executableName: 2Fast
   signAndEditExecutable: false
 
@@ -47,12 +48,12 @@ linux:
   target:
     - target: AppImage
       arch: [x64]
-  icon: resources/icons/app/app-icon-main.png
+  icon: assets/icon.png
   category: Utility
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  installerIcon: resources/icons/app/app-icon-main.ico
-  uninstallerIcon: resources/icons/app/app-icon-main.ico
-  installerHeaderIcon: resources/icons/app/app-icon-main.ico
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  installerHeaderIcon: assets/icon.ico

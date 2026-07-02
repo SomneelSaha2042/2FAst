@@ -83,7 +83,7 @@ const relativeTime = (iso: string): string => {
 	return `${minutes}m ago`
 }
 
-const resourcesPath = (): string => app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
+const assetsPath = (): string => app.isPackaged ? join(process.resourcesPath, 'assets') : join(app.getAppPath(), 'assets')
 
 export class TrayController {
 	private readonly tray: Tray
@@ -95,8 +95,8 @@ export class TrayController {
 
 	constructor(context: TrayContext) {
 		this.context = context
-		this.normalIcon = this.loadIcon(process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'icons/tray/tray-icon-idle.png')
-		this.activeIcon = this.loadIcon(process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'icons/tray/tray-icon-active.png')
+		this.normalIcon = this.loadIcon(process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'tray-icon.png')
+		this.activeIcon = this.loadIcon(process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'tray-icon-active.png')
 		this.tray = new Tray(this.normalIcon)
 		this.tray.setToolTip('2Fast')
 		this.tray.on('click', () => {
@@ -138,7 +138,7 @@ export class TrayController {
 	}
 
 	private loadIcon(file: string) {
-		const image = nativeImage.createFromPath(join(resourcesPath(), file))
+		const image = nativeImage.createFromPath(join(assetsPath(), file))
 		if (process.platform === 'darwin' && file.includes('Template')) {
 			image.setTemplateImage(true)
 		}
