@@ -95,8 +95,8 @@ export class TrayController {
 
 	constructor(context: TrayContext) {
 		this.context = context
-		this.normalIcon = this.loadIcon(process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'tray-icon.png')
-		this.activeIcon = this.loadIcon(process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'tray-icon-active.png')
+		this.normalIcon = this.loadIcon('2FAst.png')
+		this.activeIcon = this.loadIcon('2FAst.png')
 		this.tray = new Tray(this.normalIcon)
 		this.tray.setToolTip('2Fast')
 		this.tray.on('click', () => {
