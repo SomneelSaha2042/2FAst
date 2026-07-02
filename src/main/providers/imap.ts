@@ -115,12 +115,22 @@ function decodePart(content: string, encoding?: string): string {
 	return content
 }
 
+function getTypeAndSubtype(n: ImapBodyPart): { type: string; subtype: string } {
+	let type = (n.type || '').toLowerCase()
+	let subtype = (n.subtype || '').toLowerCase()
+	if (type.includes('/')) {
+		const parts = type.split('/')
+		type = parts[0]
+		subtype = parts[1] || ''
+	}
+	return { type, subtype }
+}
+
 function findTextParts(node?: ImapBodyPart): { plainPartId?: string; htmlPartId?: string } {
 	const result: { plainPartId?: string; htmlPartId?: string } = {}
 	const traverse = (n?: ImapBodyPart) => {
 		if (!n) return
-		const type = (n.type || '').toLowerCase()
-		const subtype = (n.subtype || '').toLowerCase()
+		const { type, subtype } = getTypeAndSubtype(n)
 		const disposition = (n.disposition || '').toLowerCase()
 		
 		if (disposition !== 'attachment') {
@@ -159,8 +169,7 @@ function findAttachments(node?: ImapBodyPart): Attachment[] {
 	let count = 0
 	const traverse = (n?: ImapBodyPart) => {
 		if (!n) return
-		const type = (n.type || '').toLowerCase()
-		const subtype = (n.subtype || '').toLowerCase()
+		const { type, subtype } = getTypeAndSubtype(n)
 		const disposition = (n.disposition || '').toLowerCase()
 		
 		const isMultipart = type === 'multipart'
@@ -173,7 +182,7 @@ function findAttachments(node?: ImapBodyPart): Attachment[] {
 			attachments.push({
 				id: n.id || n.parameters?.['content-id'] || `attachment-${count}`,
 				filename,
-				mimeType: `${n.type}/${n.subtype}`,
+				mimeType: `${type}/${subtype}`,
 				size: n.size || 0,
 			})
 		}
@@ -300,14 +309,26 @@ export class ImapProvider implements MailProvider {
 		const folders = await client.list({ statusQuery: { messages: true, unseen: true } })
 		return folders
 			.filter((folder) => !folder.flags.has('\\Noselect'))
-			.map((folder) => ({
-				id: folder.path,
-				accountId: this.accountId,
-				displayName: folder.name,
-				parentFolderId: folder.parentPath || undefined,
-				totalItemCount: folder.status?.messages,
-				unreadItemCount: folder.status?.unseen,
-			}))
+			.map((folder) => {
+				const lowerName = folder.name.toLowerCase()
+				let type: MailFolder['type'] = undefined
+				if (folder.flags.has('\\Junk') || lowerName === 'junk' || lowerName === 'spam' || lowerName === 'junk email') type = 'junk'
+				else if (folder.flags.has('\\Trash') || lowerName === 'trash' || lowerName === 'deleted items' || lowerName === 'deleted messages') type = 'trash'
+				else if (folder.flags.has('\\Sent') || lowerName === 'sent' || lowerName === 'sent items') type = 'sent'
+				else if (folder.flags.has('\\Drafts') || lowerName === 'drafts') type = 'drafts'
+				else if (folder.flags.has('\\Archive') || lowerName === 'archive') type = 'archive'
+				else if (lowerName === 'inbox' || lowerName === 'inbox') type = 'inbox'
+
+				return {
+					id: folder.path,
+					accountId: this.accountId,
+					displayName: folder.name,
+					parentFolderId: folder.parentPath || undefined,
+					totalItemCount: folder.status?.messages,
+					unreadItemCount: folder.status?.unseen,
+					type,
+				}
+			})
 	}
 
 	/**

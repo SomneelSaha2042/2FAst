@@ -24,13 +24,13 @@ const getApi = (): Window['api'] | null =>
 const getEvents = (): Window['events'] | null =>
 	(window as Window & { events?: Window['events'] }).events ?? null
 
-type AppView = 'settings' | 'gmail-setup' | 'preferences' | 'codes' | 'poll'
-type SettingsPage = 'settings' | 'gmail-setup' | 'preferences' | 'codes'
+type AppView = 'settings' | 'add-account' | 'gmail-setup' | 'preferences' | 'codes' | 'poll'
+type SettingsPage = 'settings' | 'add-account' | 'gmail-setup' | 'preferences' | 'codes'
 
 const viewFromLocation = (): AppView => {
 	const params = new URLSearchParams(window.location.search)
 	const view = params.get('view')
-	if (view === 'poll' || view === 'gmail-setup' || view === 'preferences' || view === 'codes') {
+	if (view === 'poll' || view === 'gmail-setup' || view === 'add-account' || view === 'preferences' || view === 'codes') {
 		return view
 	}
 	return 'settings'
@@ -71,6 +71,7 @@ interface SettingsState {
 	readonly providers: readonly ProviderDescriptor[]
 	readonly settings: OtpSettings
 	readonly gmailConfigured: boolean
+	readonly gmailConfigEmail?: string
 }
 
 type PollState = 'idle' | 'scanning' | 'complete' | 'error'
@@ -141,6 +142,33 @@ const initialSettingsState: SettingsState = {
 	providers: [],
 	settings: DEFAULT_SETTINGS,
 	gmailConfigured: false,
+}
+
+function CopyLinkButton({ url, label, icon }: { readonly url: string; readonly label: string; readonly icon: string }): ReactElement {
+	const [copied, setCopied] = useState(false)
+	const handleCopy = async (): Promise<void> => {
+		try {
+			await navigator.clipboard.writeText(url)
+			setCopied(true)
+			setTimeout(() => setCopied(false), 2000)
+		} catch {
+			// ignore
+		}
+	}
+	return (
+		<button
+			type="button"
+			className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant/30 text-on-surface hover:bg-surface-container-highest transition-all text-xs font-semibold cursor-pointer"
+			onClick={() => void handleCopy()}
+			title={url}
+		>
+			<span className="material-symbols-outlined text-[16px] opacity-70">{icon}</span>
+			<span>{label}</span>
+			<span className={`material-symbols-outlined text-[14px] ml-1 ${copied ? 'text-green-400' : 'text-primary opacity-80'}`}>
+				{copied ? 'check' : 'content_copy'}
+			</span>
+		</button>
+	)
 }
 
 /**
@@ -330,13 +358,15 @@ function SettingsView(): ReactElement {
 	const [clientId, setClientId] = useState<string>('')
 	const [clientSecret, setClientSecret] = useState<string>('')
 	const [projectId, setProjectId] = useState<string>('')
-	const [imapProvider, setImapProvider] = useState<Exclude<Provider, 'gmail' | 'outlook'>>('yahoo')
+	const [imapProvider, setImapProvider] = useState<Exclude<Provider, 'gmail' | 'outlook'>>('zoho')
 	const [imapEmail, setImapEmail] = useState<string>('')
 	const [imapUsername, setImapUsername] = useState<string>('')
 	const [imapPassword, setImapPassword] = useState<string>('')
 	const [imapHost, setImapHost] = useState<string>('')
 	const [imapPort, setImapPort] = useState<string>('993')
 	const [imapSecurity, setImapSecurity] = useState<ImapSecurity>('tls')
+	const [selectedVendor, setSelectedVendor] = useState<Provider>('gmail')
+	const [hasManuallyEditedHost, setHasManuallyEditedHost] = useState<boolean>(false)
 
 	const grouped = useMemo(() =>
 		state.providers
@@ -351,7 +381,50 @@ function SettingsView(): ReactElement {
 		state.providers.filter((descriptor) => descriptor.transport === 'imap'),
 	[state.providers])
 
-	const selectedImapDescriptor = imapDescriptors.find((descriptor) => descriptor.id === imapProvider)
+
+	const getZohoHostForEmail = (emailStr: string): string => {
+		const domain = emailStr.trim().split('@')[1]?.toLowerCase() || ''
+		if (domain.endsWith('.in')) return 'imap.zoho.in'
+		if (domain.endsWith('.eu')) return 'imap.zoho.eu'
+		if (domain.endsWith('.com.cn') || domain.endsWith('.cn')) return 'imap.zoho.com.cn'
+		return 'imap.zoho.com'
+	}
+
+	const handleVendorChange = (vendor: Provider) => {
+		setSelectedVendor(vendor)
+		setHasManuallyEditedHost(false)
+		if (vendor !== 'gmail' && vendor !== 'outlook') {
+			setImapProvider(vendor)
+		}
+	}
+
+	const handleHostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		setImapHost(e.target.value)
+		setHasManuallyEditedHost(true)
+	}
+
+	useEffect(() => {
+		if (page === 'gmail-setup') {
+			setPage('add-account')
+			setSelectedVendor('gmail')
+		}
+	}, [page])
+
+	useEffect(() => {
+		if (hasManuallyEditedHost) return
+		if (imapProvider === 'zoho') {
+			setImapHost(getZohoHostForEmail(imapEmail))
+			setImapPort('993')
+			setImapSecurity('tls')
+		} else {
+			const desc = imapDescriptors.find((d) => d.id === imapProvider)
+			if (desc?.imapPreset) {
+				setImapHost(desc.imapPreset.host)
+				setImapPort(String(desc.imapPreset.port))
+				setImapSecurity(desc.imapPreset.security)
+			}
+		}
+	}, [imapProvider, imapEmail, imapDescriptors, hasManuallyEditedHost])
 
 	const navigateToPage = (nextPage: SettingsPage): void => {
 		setPage(nextPage)
@@ -380,22 +453,13 @@ function SettingsView(): ReactElement {
 			providers: providersResult.data ?? [],
 			settings: settingsResult.data ?? DEFAULT_SETTINGS,
 			gmailConfigured: Boolean(gmailStatusResult.success && gmailStatusResult.data?.configured),
+			gmailConfigEmail: gmailStatusResult.success ? gmailStatusResult.data?.email : undefined,
 		})
 	}, [])
 
 	useEffect(() => {
 		void refresh()
 	}, [refresh])
-
-	const copyText = async (value: string, successMessage: string): Promise<void> => {
-		try {
-			await navigator.clipboard.writeText(value)
-			setStatus(successMessage)
-			setError(null)
-		} catch (clipboardError) {
-			setError(clipboardError instanceof Error ? clipboardError.message : 'Failed to copy to clipboard')
-		}
-	}
 
 	const updateSettings = async (partial: Partial<OtpSettings>): Promise<void> => {
 		const api = getApi()
@@ -457,7 +521,8 @@ function SettingsView(): ReactElement {
 		if (!state.gmailConfigured) {
 			setStatus('Save Gmail BYOC credentials before connecting Gmail.')
 			setError(null)
-			navigateToPage('gmail-setup')
+			setSelectedVendor('gmail')
+			navigateToPage('add-account')
 			return
 		}
 		await addAccount({ authentication: 'oauth', provider: 'gmail' })
@@ -549,6 +614,7 @@ function SettingsView(): ReactElement {
 			setGmailSaveState('saved')
 			setGmailSaveMessage(`Saved Gmail credentials to ${result.data.path}`)
 			await refresh()
+			setTimeout(() => navigateToPage('settings'), 1500)
 		} catch (requestError) {
 			const message = requestError instanceof Error ? requestError.message : 'Unknown error'
 			setGmailSaveState('error')
@@ -561,15 +627,15 @@ function SettingsView(): ReactElement {
 
 	const intervals = [5000, 10000, 15000, 30000, 60000]
 	const ttlValues = [5, 10, 15, 30]
-	const pageTitle = page === 'gmail-setup' ? 'Gmail Setup' : page === 'preferences' ? 'Preferences' : page === 'codes' ? 'Codes Feed' : 'Settings'
+	const pageTitle = page === 'add-account' ? 'Add Account' : page === 'preferences' ? 'Preferences' : page === 'codes' ? 'Codes Feed' : 'Settings'
 
 	return (
 		<WindowChrome title={pageTitle} view={page}>
 			<div className="flex flex-1 mt-8 h-[calc(720px-32px)] overflow-hidden">
 				{/* SideNavBar (Visible on Settings, Codes & Preferences views) */}
-				{page !== 'gmail-setup' && (
+				{page !== 'add-account' && (
 					<aside className="h-full w-20 flex flex-col items-center py-6 bg-surface/80 backdrop-blur-xl border-r border-outline-variant/15 shrink-0 z-20 select-none">
-						<div className="flex flex-col items-center gap-1 mb-6">
+						<div className="flex flex-col items-center gap-1 mb-6 opacity-80" title="2FAst Secure End-to-End">
 							<span className="material-symbols-outlined text-primary text-[28px]">lock_open</span>
 							<span className="text-[9px] text-outline text-center uppercase tracking-widest font-bold">Secure</span>
 						</div>
@@ -616,8 +682,8 @@ function SettingsView(): ReactElement {
 
 				{/* Main Content Pane */}
 				<div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-					{/* Secondary navigation for Gmail Setup Wizard */}
-					{page === 'gmail-setup' && (
+					{/* Secondary navigation for Wizard Views */}
+					{(page === 'add-account') && (
 						<div className="px-6 py-4 flex items-center justify-between border-b border-outline-variant/10 shrink-0 z-40 relative">
 							<button
 								type="button"
@@ -627,32 +693,13 @@ function SettingsView(): ReactElement {
 								<span className="material-symbols-outlined text-[20px] group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
 								<span className="text-label-caps font-bold">Back to Accounts</span>
 							</button>
-							<div className="flex items-center gap-3">
-								<button
-									type="button"
-									className="flex items-center gap-2 px-4 py-2 rounded-lg border border-outline-variant/30 text-on-surface hover:bg-surface-container-highest transition-all text-xs font-semibold cursor-pointer"
-									onClick={() => void copyText(GOOGLE_CONSOLE_URL, 'Google Console link copied.')}
-								>
-									<span className="material-symbols-outlined text-[16px]">open_in_new</span>
-									Console
-								</button>
-								<button
-									type="button"
-									className="flex items-center gap-2 px-4 py-2 rounded-lg border border-outline-variant/30 text-on-surface hover:bg-surface-container-highest transition-all text-xs font-semibold cursor-pointer"
-									onClick={() => void copyText(GOOGLE_CREDENTIALS_URL, 'Credentials link copied.')}
-								>
-									<span className="material-symbols-outlined text-[16px]">key</span>
-									Credentials
-								</button>
-								<button
-									type="button"
-									className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all text-xs font-semibold cursor-pointer"
-									onClick={() => void copyText(BYOC_GUIDE_URL, 'OAuth guide link copied.')}
-								>
-									<span className="material-symbols-outlined text-[16px]">menu_book</span>
-									OAuth Guide
-								</button>
-							</div>
+							{selectedVendor === 'gmail' && (
+								<div className="flex items-center gap-2">
+									<CopyLinkButton url={GOOGLE_CONSOLE_URL} label="Console" icon="open_in_new" />
+									<CopyLinkButton url={GOOGLE_CREDENTIALS_URL} label="Credentials" icon="key" />
+									<CopyLinkButton url={BYOC_GUIDE_URL} label="OAuth Guide" icon="menu_book" />
+								</div>
+							)}
 						</div>
 					)}
 
@@ -664,38 +711,22 @@ function SettingsView(): ReactElement {
 						<div className="max-w-2xl mx-auto flex flex-col gap-6 relative z-10">
 							{page === 'settings' ? (
 								<>
-									{/* Screen Title */}
-									<div className="text-left">
-										<h1 className="text-headline-md text-on-surface mb-2 font-semibold">Account Management</h1>
-										<p className="text-body-base text-outline">Connect your email providers to automatically sync 2FA tokens and security alerts.</p>
+									<div className="text-left flex items-start justify-between">
+										<div>
+											<h1 className="text-headline-md text-on-surface mb-2 font-semibold">Account Management</h1>
+											<p className="text-body-base text-outline">Manage your connected email providers for OTP syncing.</p>
+										</div>
+										<button
+											type="button"
+											className="bg-primary hover:bg-primary-container text-on-primary font-bold px-6 py-3 rounded-xl transition-all transform active:scale-95 shadow-[0_0_20px_rgba(164,201,255,0.2)] flex items-center gap-2 cursor-pointer shrink-0"
+											onClick={() => navigateToPage('add-account')}
+										>
+											<span className="material-symbols-outlined">add</span>
+											Add Account
+										</button>
 									</div>
 
-									{/* Quick Action buttons to add accounts */}
-									<section>
-										<div className="grid grid-cols-2 gap-4">
-											<button
-												type="button"
-												disabled={isWorking}
-												className="flex items-center justify-center gap-3 bg-surface-container-high border border-outline-variant/30 py-4 px-6 rounded-xl hover:bg-surface-container-highest transition-all neon-border-hover group disabled:opacity-50 cursor-pointer"
-												onClick={addGmailAccount}
-											>
-												<span className="material-symbols-outlined text-primary text-[24px] group-hover:scale-105 transition-transform">mail</span>
-												<span className="text-headline-sm text-on-surface">Add Gmail</span>
-											</button>
-											<button
-												type="button"
-												disabled={isWorking}
-												className="flex items-center justify-center gap-3 bg-surface-container-high border border-outline-variant/30 py-4 px-6 rounded-xl hover:bg-surface-container-highest transition-all neon-border-hover group disabled:opacity-50 cursor-pointer"
-												onClick={() => void addAccount({ authentication: 'oauth', provider: 'outlook' })}
-											>
-												<span className="material-symbols-outlined text-primary text-[24px] group-hover:scale-105 transition-transform">work</span>
-												<span className="text-headline-sm text-on-surface">Add Outlook</span>
-											</button>
-										</div>
-									</section>
-
-									{/* List of accounts connected */}
-									<section className="flex flex-col gap-3 text-left">
+									<section className="flex flex-col gap-3 text-left mt-4">
 										<h2 className="text-label-caps text-outline uppercase tracking-[0.15em] font-bold">Connected Services</h2>
 										{grouped.map((group) => (
 											<div key={group.descriptor.id} className="space-y-3">
@@ -735,75 +766,274 @@ function SettingsView(): ReactElement {
 												))}
 											</div>
 										))}
-										{state.accounts.length === 0 && (
-											<p className="text-body-base text-outline glass-panel p-4 rounded-xl">No accounts connected yet.</p>
+										{state.accounts.length === 0 && !state.gmailConfigured && (
+											<p className="text-body-base text-outline glass-panel p-4 rounded-xl">No accounts connected yet. Click Add Account to get started.</p>
+										)}
+										{state.gmailConfigured && state.gmailConfigEmail && !state.accounts.some(a => a.email.toLowerCase() === state.gmailConfigEmail!.toLowerCase() && a.provider === 'gmail') && (
+											<div className="glass-panel p-4 rounded-xl flex items-center justify-between border-l-4 border-l-outline-variant group transition-all mt-3">
+												<div className="flex items-center gap-4">
+													<div className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-outline">
+														<span className="material-symbols-outlined">mail</span>
+													</div>
+													<div>
+														<p className="text-body-base font-semibold text-on-surface">{state.gmailConfigEmail}</p>
+														<p className="text-body-sm text-outline">
+															Provider: Google Workspace / Gmail • <span className="text-primary font-semibold">Ready to Connect</span>
+														</p>
+													</div>
+												</div>
+												<div className="flex gap-2">
+													<button
+														type="button"
+														disabled={isWorking}
+														className="px-6 py-1.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30 transition-colors text-label-caps font-bold cursor-pointer disabled:opacity-50"
+														onClick={addGmailAccount}
+													>
+														Connect
+													</button>
+												</div>
+											</div>
 										)}
 									</section>
+								</>
+							) : null}
 
-									{/* IMAP accounts connection form */}
-									<section className="mt-2 pb-8">
-										<div className="flex items-center gap-4 mb-5">
-											<div className="h-[1px] flex-1 bg-outline-variant/30"></div>
-											<h2 className="text-label-caps text-outline uppercase tracking-[0.15em] font-bold shrink-0">Add IMAP Account</h2>
-											<div className="h-[1px] flex-1 bg-outline-variant/30"></div>
+							{page === 'add-account' ? (
+								<>
+									<div className="text-left mb-6">
+										<h1 className="text-headline-md text-on-surface mb-2 font-semibold">Add New Account</h1>
+										<p className="text-body-base text-outline">Select a provider and follow the steps to connect your mailbox.</p>
+									</div>
+
+									{/* Dropdown Card */}
+									<div className="glass-panel p-6 rounded-xl text-left border border-outline-variant/30 mb-6">
+										<div className="flex flex-col gap-input-gap">
+											<label className="text-label-caps text-outline ml-1">SELECT VENDOR</label>
+											<select
+												className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all cursor-pointer font-semibold"
+												value={selectedVendor}
+												onChange={(e) => handleVendorChange(e.target.value as Provider)}
+											>
+												<option value="gmail">Google Workspace / Gmail</option>
+												<option value="outlook">Microsoft Outlook</option>
+												<option value="zoho">Zoho Mail (Verified IMAP)</option>
+												<option value="imap">Custom IMAP (Other Providers)</option>
+											</select>
 										</div>
-										<div className="grid grid-cols-2 gap-x-6 gap-y-4 text-left">
-											<div className="flex flex-col gap-input-gap">
-												<label className="text-label-caps text-outline ml-1">PROVIDER</label>
-												<select
-													className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all cursor-pointer"
-													value={imapProvider}
-													onChange={(e) => setImapProvider(e.target.value as Exclude<Provider, 'gmail' | 'outlook'>)}
-												>
-													{imapDescriptors.map((desc) => (
-														<option key={desc.id} value={desc.id}>{desc.displayName}</option>
-													))}
-												</select>
-											</div>
-											<div className="flex flex-col gap-input-gap">
-												<label className="text-label-caps text-outline ml-1">EMAIL ADDRESS</label>
-												<input
-													type="email"
-													className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all placeholder:text-outline/40"
-													placeholder="user@provider.com"
-													value={imapEmail}
-													onChange={(e) => {
-														setImapEmail(e.target.value)
-														if (!imapUsername) setImapUsername(e.target.value)
-													}}
-												/>
-											</div>
-											<div className="flex flex-col gap-input-gap">
-												<label className="text-label-caps text-outline ml-1">IMAP USERNAME</label>
-												<input
-													type="text"
-													className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all placeholder:text-outline/40"
-													placeholder="username_login"
-													value={imapUsername}
-													onChange={(e) => setImapUsername(e.target.value)}
-												/>
-											</div>
-											<div className="flex flex-col gap-input-gap">
-												<label className="text-label-caps text-outline ml-1">APP PASSWORD</label>
-												<input
-													type="password"
-													autoComplete="new-password"
-													className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all placeholder:text-outline/40"
-													placeholder="••••••••••••"
-													value={imapPassword}
-													onChange={(e) => setImapPassword(e.target.value)}
-												/>
+									</div>
+
+									{/* Conditional views */}
+									{selectedVendor === 'gmail' && (
+										<div className="space-y-6 text-left">
+											<div className="glass-panel p-5 rounded-xl border border-blue-500/20 bg-blue-950/10 mb-5 leading-relaxed text-sm">
+												<h4 className="font-bold text-on-surface mb-2 flex items-center gap-1.5">
+													<span className="material-symbols-outlined text-[18px] text-primary">info</span>
+													Gmail BYOC Setup Guide
+												</h4>
+												<p className="text-outline">
+													Follow these steps to generate your own Google Cloud client credentials. This keeps your data private and ensures you have dedicated API rate limits.
+												</p>
 											</div>
 
-											{imapProvider === 'imap' && (
-												<>
+											<div className="space-y-5 pb-6">
+												{[
+													{ step: 1, title: 'Log In', text: 'Log in with the Google account you want to link in 2Fast.' },
+													{ step: 2, title: 'Open Google Console', text: 'Open the Google Cloud Console for that account.' },
+													{ step: 3, title: 'Create a Project', text: 'Create a project named "Personal", or use an existing project.' },
+													{ step: 4, title: 'Navigate to Credentials', text: 'Switch to the selected project and go to APIs and Services, then Credentials.' },
+													{ step: 5, title: 'Configure Consent Screen', text: 'Configure OAuth consent screen with app name 2FAst, support email set to your Gmail, audience set to External, and contact email set to your email.' },
+													{ step: 6, title: 'Add modify Scope', text: 'Go to Data Access, add scope "https://www.googleapis.com/auth/gmail.modify", then update.' },
+													{ step: 7, title: 'Enable Gmail API', text: 'Go to Enabled APIs and Services, search for Gmail API, and click Enable.' },
+													{ step: 8, title: 'Add Test User', text: 'Go to Audience and add your email as a test user.' },
+													{ step: 9, title: 'Create Desktop Client', text: 'Go to Clients, click Create Client, set Application type to Desktop app, then create it.' },
+													{ step: 10, title: 'Copy and Save', text: 'Copy the client ID and client secret into the fields below, then save credentials.' }
+												].map((item) => (
+													<div key={item.step} className="flex gap-4">
+														<div className="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-xs shrink-0 select-none shadow-[0_0_10px_rgba(164,201,255,0.3)]">
+															{item.step}
+														</div>
+														<div className="flex-1">
+															<h4 className="text-body-base font-semibold text-on-surface mb-0.5">{item.title}</h4>
+															<p className="text-body-sm text-outline leading-relaxed">{item.text}</p>
+														</div>
+													</div>
+												))}
+											</div>
+
+											{/* Gmail BYOC config inputs */}
+											<div className="glass-panel p-6 rounded-xl border border-outline-variant/30 space-y-4">
+												<h3 className="text-headline-sm font-semibold text-on-surface mb-2">Gmail API Credentials</h3>
+												<div className="grid grid-cols-2 gap-4">
+													<div className="flex flex-col gap-input-gap">
+														<label className="text-label-caps text-outline ml-1">GMAIL EMAIL</label>
+														<input
+															type="email"
+															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+															placeholder="user@gmail.com"
+															value={gmailEmail}
+															onChange={(e) => setGmailEmail(e.target.value)}
+														/>
+													</div>
+													<div className="flex flex-col gap-input-gap">
+														<label className="text-label-caps text-outline ml-1">PROJECT ID (OPTIONAL)</label>
+														<input
+															type="text"
+															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+															placeholder="e.g. personal-project-123"
+															value={projectId}
+															onChange={(e) => setProjectId(e.target.value)}
+														/>
+													</div>
+													<div className="flex flex-col gap-input-gap">
+														<label className="text-label-caps text-outline ml-1">CLIENT ID</label>
+														<input
+															type="text"
+															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all font-mono text-sm"
+															placeholder="Paste Client ID"
+															value={clientId}
+															onChange={(e) => setClientId(e.target.value)}
+														/>
+													</div>
+													<div className="flex flex-col gap-input-gap">
+														<label className="text-label-caps text-outline ml-1">CLIENT SECRET</label>
+														<input
+															type="password"
+															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+															placeholder="Paste Client Secret"
+															value={clientSecret}
+															onChange={(e) => setClientSecret(e.target.value)}
+														/>
+													</div>
+												</div>
+												<div className="pt-2 flex items-center justify-between gap-4">
+													{gmailSaveMessage && (
+														<span role={gmailSaveState === 'error' ? 'alert' : 'status'} className={`text-xs font-semibold ${gmailSaveState === 'error' ? 'text-red-400' : 'text-green-400'}`}>
+															{gmailSaveMessage}
+														</span>
+													)}
+													<button
+														type="button"
+														disabled={isWorking || !gmailEmail.trim() || !clientId.trim() || !clientSecret.trim()}
+														className="ml-auto bg-gradient-to-r from-primary-container to-blue-600 text-on-primary-container font-bold py-3.5 px-8 rounded-xl shadow-[0_0_20px_rgba(96,165,250,0.2)] hover:shadow-[0_0_30px_rgba(96,165,250,0.4)] hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-sm"
+														onClick={saveByocConfig}
+													>
+														{gmailSaveState === 'saving' ? 'Saving...' : 'Save Google Credentials'}
+													</button>
+												</div>
+											</div>
+										</div>
+									)}
+
+									{selectedVendor === 'outlook' && (
+										<div className="glass-panel p-6 rounded-xl text-left border border-outline-variant/30 flex flex-col gap-4">
+											<div className="flex items-center gap-3">
+												<span className="material-symbols-outlined text-primary text-[28px]">work</span>
+												<h3 className="text-headline-sm font-semibold text-on-surface">Microsoft Outlook</h3>
+											</div>
+											<p className="text-body-base text-outline leading-relaxed">
+												Connect your Outlook, Hotmail, or Microsoft 365 account with one click using Microsoft OAuth.
+											</p>
+											<div className="pt-2">
+												<button
+													type="button"
+													disabled={isWorking}
+													className="w-full bg-primary hover:bg-primary-container text-on-primary font-bold py-3.5 rounded-xl transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 text-sm shadow-[0_0_15px_rgba(164,201,255,0.15)]"
+													onClick={() => void addAccount({ authentication: 'oauth', provider: 'outlook' })}
+												>
+													<span className="material-symbols-outlined text-[20px]">login</span> Connect Outlook Account
+												</button>
+											</div>
+										</div>
+									)}
+
+									{selectedVendor !== 'gmail' && selectedVendor !== 'outlook' && (
+										<div className="space-y-4">
+											{/* Zoho custom instructions */}
+											{selectedVendor === 'zoho' && (
+												<div className="glass-panel p-5 rounded-xl border border-blue-500/20 bg-blue-950/10 leading-relaxed text-sm text-left">
+													<h4 className="font-bold text-on-surface mb-2 flex items-center gap-1.5">
+														<span className="material-symbols-outlined text-[18px] text-primary">info</span>
+														Zoho Mail Setup Instructions (Custom IMAP)
+													</h4>
+													<ol className="list-decimal list-inside space-y-2 text-outline">
+														<li>
+															<strong>Enable IMAP Access</strong>: Sign in to Zoho Mail web interface → Open <strong>Settings</strong> → Go to <strong>Mail Accounts</strong> → Select your primary email address → Scroll to the <strong>IMAP</strong> section → Check <strong>IMAP Access</strong> → Click <strong>Save</strong>.
+														</li>
+														<li>
+															<strong>Generate App Password</strong>: Go to your Zoho Accounts dashboard (accounts.zoho.com) → Select <strong>Security</strong> → <strong>App passwords</strong> → Click <strong>Generate New Password</strong> → Enter the name <code className="bg-surface-container-highest px-1.5 py-0.5 rounded text-on-surface font-semibold text-xs">2FAST</code> and click <strong>Generate</strong>.
+														</li>
+														<li>
+															<strong>Enter Credentials</strong>:
+															<ul className="list-disc list-inside ml-5 mt-1 space-y-1">
+																<li><strong>Email Address</strong>: Enter your full Zoho email (e.g., <code className="text-on-surface">user@zoho.com</code>).</li>
+																<li><strong>IMAP Username</strong>: Must be your <strong className="text-on-surface">full email address</strong> (do not enter the app name "2FAST").</li>
+																<li><strong>App Password</strong>: Copy and paste the 16-character generated code <strong className="text-on-surface">without any spaces</strong>.</li>
+															</ul>
+														</li>
+													</ol>
+												</div>
+											)}
+
+
+
+											{/* Generic IMAP instructions */}
+											{selectedVendor === 'imap' && (
+												<div className="glass-panel p-5 rounded-xl border border-outline-variant/30 leading-relaxed text-sm text-left">
+													<h4 className="font-bold text-on-surface mb-1.5 flex items-center gap-1.5">
+														<span className="material-symbols-outlined text-[18px] text-primary">info</span>
+														Custom IMAP Setup
+													</h4>
+													<p className="text-outline">
+														Enter the secure incoming IMAP server credentials provided by your email host (Yahoo, iCloud, Fastmail, Proton Mail Bridge, or any private mail server).
+													</p>
+												</div>
+											)}
+
+											{/* IMAP Input Fields Card */}
+											<div className="glass-panel p-6 rounded-xl border border-outline-variant/30 text-left">
+												<div className="grid grid-cols-2 gap-x-6 gap-y-4">
+													<div className="flex flex-col gap-input-gap">
+														<label className="text-label-caps text-outline ml-1">EMAIL ADDRESS</label>
+														<input
+															type="email"
+															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all placeholder:text-outline/40"
+															placeholder="user@provider.com"
+															value={imapEmail}
+															onChange={(e) => {
+																setImapEmail(e.target.value)
+																if (!imapUsername) setImapUsername(e.target.value)
+															}}
+														/>
+													</div>
+													<div className="flex flex-col gap-input-gap">
+														<label className="text-label-caps text-outline ml-1">IMAP USERNAME</label>
+														<input
+															type="text"
+															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all placeholder:text-outline/40"
+															placeholder="full email address or login name"
+															value={imapUsername}
+															onChange={(e) => setImapUsername(e.target.value)}
+														/>
+													</div>
+													<div className="flex flex-col gap-input-gap col-span-2">
+														<label className="text-label-caps text-outline ml-1">APP PASSWORD</label>
+														<input
+															type="password"
+															autoComplete="new-password"
+															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all placeholder:text-outline/40"
+															placeholder="••••••••••••"
+															value={imapPassword}
+															onChange={(e) => setImapPassword(e.target.value)}
+														/>
+													</div>
+
 													<div className="flex flex-col gap-input-gap">
 														<label className="text-label-caps text-outline ml-1">IMAP HOST</label>
 														<input
 															type="text"
 															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
 															value={imapHost}
-															onChange={(e) => setImapHost(e.target.value)}
+															onChange={handleHostChange}
 														/>
 													</div>
 													<div className="flex flex-col gap-input-gap">
@@ -824,28 +1054,25 @@ function SettingsView(): ReactElement {
 															value={imapSecurity}
 															onChange={(e) => setImapSecurity(e.target.value as ImapSecurity)}
 														>
-															<option value="tls">TLS</option>
+															<option value="tls">TLS (SSL/TLS)</option>
 															<option value="starttls">STARTTLS</option>
 														</select>
 													</div>
-												</>
-											)}
 
-											<div className="col-span-2 mt-2">
-												{selectedImapDescriptor?.setupInstructions && (
-													<p className="text-body-sm text-outline mb-3 leading-relaxed">{selectedImapDescriptor.setupInstructions}</p>
-												)}
-												<button
-													type="button"
-													disabled={isWorking || !imapEmail.trim() || !imapUsername.trim() || !imapPassword}
-													className="w-full bg-gradient-to-r from-primary-container to-blue-600 text-on-primary-container font-bold py-4 rounded-xl shadow-[0_0_20px_rgba(96,165,250,0.2)] hover:shadow-[0_0_30px_rgba(96,165,250,0.4)] hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-													onClick={addImapAccount}
-												>
-													Verify and Connect Account
-												</button>
+													<div className="col-span-2 mt-2">
+														<button
+															type="button"
+															disabled={isWorking || !imapEmail.trim() || !imapUsername.trim() || !imapPassword || !imapHost.trim()}
+															className="w-full bg-gradient-to-r from-primary-container to-blue-600 text-on-primary-container font-bold py-3.5 rounded-xl shadow-[0_0_20px_rgba(96,165,250,0.2)] hover:shadow-[0_0_30px_rgba(96,165,250,0.4)] hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-sm"
+															onClick={addImapAccount}
+														>
+															Verify and Connect Account
+														</button>
+													</div>
+												</div>
 											</div>
 										</div>
-									</section>
+									)}
 								</>
 							) : null}
 
@@ -868,114 +1095,7 @@ function SettingsView(): ReactElement {
 								</div>
 							) : null}
 
-							{page === 'gmail-setup' ? (
-								<>
-									{/* Wizard Screen Header */}
-									<div className="text-left">
-										<h1 className="text-headline-md text-on-surface mb-2 font-semibold">Connect your Gmail API</h1>
-										<p className="text-body-base text-on-surface-variant leading-relaxed">Follow these steps to generate your own API credentials. This ensures your data stays private and your rate limits are dedicated only to your account.</p>
-									</div>
 
-									{/* Step-by-step setup details */}
-									<div className="space-y-6 mb-28 text-left">
-										{[
-											{ step: 1, title: 'Log In', text: 'Log in with the Google account you want to link in 2Fast.' },
-											{ step: 2, title: 'Open Google Console', text: 'Open the Google Cloud Console for that account.' },
-											{ step: 3, title: 'Create a Project', text: 'Create a project named "Personal", or use an existing project.' },
-											{ step: 4, title: 'Navigate to Credentials', text: 'Switch to the selected project and go to APIs and Services, then Credentials.' },
-											{ step: 5, title: 'Configure Consent Screen', text: 'Configure OAuth consent screen with app name 2FAst, support email set to your Gmail, audience set to External, and contact email set to your email.' },
-											{ step: 6, title: 'Add readonly Scope', text: 'Go to Data Access, add scope "https://www.googleapis.com/auth/gmail.readonly", then update.' },
-											{ step: 7, title: 'Enable Gmail API', text: 'Go to Enabled APIs and Services, search for Gmail API, and click Enable.' },
-											{ step: 8, title: 'Add Test User', text: 'Go to Audience and add your email as a test user.' },
-											{ step: 9, title: 'Create Desktop Client', text: 'Go to Clients, click Create Client, set Application type to Desktop app, then create it.' },
-											{ step: 10, title: 'Copy and Save', text: 'Copy the client ID and client secret into the fields below, then save credentials.' }
-										].map((item) => (
-											<div key={item.step} className="flex gap-6">
-												<div className="relative">
-													<div className="w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-sm shadow-[0_0_15px_rgba(164,201,255,0.3)] shrink-0 select-none">
-														{item.step}
-													</div>
-												</div>
-												<div className="flex-1 pt-1">
-													<h3 className="text-headline-sm text-on-surface mb-1 font-semibold">{item.title}</h3>
-													<p className="text-body-base text-on-surface-variant leading-relaxed">{item.text}</p>
-												</div>
-											</div>
-										))}
-									</div>
-
-									{/* Wizard bottom input panel */}
-									<footer className="bg-surface-container-low/95 backdrop-blur-md border-t border-outline-variant/20 p-6 z-50 fixed bottom-0 left-0 w-full shrink-0">
-										<div className="max-w-2xl mx-auto grid grid-cols-2 gap-4 mb-4 text-left">
-											<div className="space-y-1">
-												<label className="text-label-caps text-on-surface-variant block uppercase tracking-wider">Gmail Email</label>
-												<input
-													type="email"
-													required
-													className="w-full bg-background border border-outline-variant/30 rounded-lg px-4 py-2 text-body-base text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 neon-glow"
-													placeholder="user@gmail.com"
-													value={gmailEmail}
-													onChange={(e) => setGmailEmail(e.target.value)}
-												/>
-											</div>
-											<div className="space-y-1">
-												<label className="text-label-caps text-on-surface-variant block uppercase tracking-wider">Project ID (Optional)</label>
-												<input
-													type="text"
-													className="w-full bg-background border border-outline-variant/30 rounded-lg px-4 py-2 text-body-base text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 neon-glow"
-													placeholder="e.g. personal-project-123"
-													value={projectId}
-													onChange={(e) => setProjectId(e.target.value)}
-												/>
-											</div>
-											<div className="space-y-1">
-												<label className="text-label-caps text-on-surface-variant block uppercase tracking-wider">Client ID</label>
-												<input
-													type="text"
-													required
-													className="w-full bg-background border border-outline-variant/30 rounded-lg px-4 py-2 text-body-base text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 neon-glow"
-													placeholder="0000-xxxx.apps.googleusercontent.com"
-													value={clientId}
-													onChange={(e) => setClientId(e.target.value)}
-												/>
-											</div>
-											<div className="space-y-1">
-												<label className="text-label-caps text-on-surface-variant block uppercase tracking-wider">Client Secret</label>
-												<input
-													type="password"
-													required
-													className="w-full bg-background border border-outline-variant/30 rounded-lg px-4 py-2 text-body-base text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 neon-glow"
-													placeholder="••••••••••••••••••••"
-													value={clientSecret}
-													onChange={(e) => setClientSecret(e.target.value)}
-												/>
-											</div>
-										</div>
-										<div className="max-w-2xl mx-auto flex items-center justify-between gap-6">
-											<div className="flex items-center gap-2 text-on-surface-variant text-[11px]">
-												<span className="material-symbols-outlined text-tertiary text-[16px]">info</span>
-												<span>Credentials are stored securely in your OS keychain.</span>
-											</div>
-											<div className="flex items-center gap-4">
-												{gmailSaveMessage && (
-													<span role={gmailSaveState === 'error' ? 'alert' : 'status'} className={`text-xs font-semibold ${gmailSaveState === 'error' ? 'text-red-400' : 'text-green-400'}`}>
-														{gmailSaveMessage}
-													</span>
-												)}
-												<button
-													type="button"
-													disabled={isWorking || !gmailEmail.trim() || !clientId.trim() || !clientSecret.trim()}
-													className="bg-primary hover:bg-primary-container text-on-primary font-bold px-8 py-2.5 rounded-lg transition-all transform active:scale-95 shadow-[0_0_20px_rgba(164,201,255,0.2)] flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-													onClick={saveByocConfig}
-												>
-													{gmailSaveState === 'saving' ? 'Saving...' : 'Authorize & Finish'}
-													<span className="material-symbols-outlined">chevron_right</span>
-												</button>
-											</div>
-										</div>
-									</footer>
-								</>
-							) : null}
 
 							{page === 'preferences' ? (
 								<>

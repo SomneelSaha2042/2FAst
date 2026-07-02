@@ -1,4 +1,4 @@
-export type Provider = 'gmail' | 'outlook' | 'yahoo' | 'icloud' | 'fastmail' | 'zoho' | 'proton' | 'imap'
+export type Provider = 'gmail' | 'outlook' | 'zoho' | 'imap'
 export type ProviderTransport = 'gmail-api' | 'microsoft-graph' | 'imap'
 export type ProviderAuthentication = 'oauth' | 'app-password'
 export type MailboxStyle = 'labels' | 'folders'
@@ -98,4 +98,5 @@ export interface MailFolder {
 	readonly parentFolderId?: string
 	readonly totalItemCount?: number
 	readonly unreadItemCount?: number
+	readonly type?: 'inbox' | 'junk' | 'trash' | 'sent' | 'drafts' | 'archive'
 }

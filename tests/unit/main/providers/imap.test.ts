@@ -71,7 +71,7 @@ describe('IMAP provider', () => {
 			{ uid: 8, seq: 2, flags: new Set(), envelope: { subject: 'Code 8', from: [{ address: 'sender@example.com' }], date: new Date('2026-06-09T02:00:00Z') } },
 		])
 		const { ImapProvider } = await import('../../../../src/main/providers/imap')
-		const provider = new ImapProvider('account-1', 'yahoo', credentials)
+		const provider = new ImapProvider('account-1', 'zoho', credentials)
 		const result = await provider.listMessages({
 			maxResults: 2,
 			receivedAfter: '2026-06-09T00:00:00Z',

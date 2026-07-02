@@ -20,7 +20,7 @@ interface StoreApi<T> { get: <K extends keyof T>(key: K) => T[K]; set: <K extend
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
-const GOOGLE_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile'] as const
+const GOOGLE_SCOPES = ['https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile'] as const
 const defaultStore: AccountStoreShape = { accounts: [] }
 
 export class AccountManager {
@@ -204,8 +204,7 @@ export class AccountManager {
 		if (!host || !/^(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|::1)$/i.test(host) || host.includes('..')) throw new Error('Invalid IMAP host')
 		if (!port || !Number.isInteger(port) || port < 1 || port > 65_535) throw new Error('Invalid IMAP port')
 		if (security !== 'tls' && security !== 'starttls') throw new Error('Custom IMAP must use TLS or STARTTLS')
-		if (provider === 'proton' && host !== '127.0.0.1' && host !== 'localhost' && host !== '::1') throw new Error('Proton Bridge must use a loopback host')
-		return { host, port, security, username, password, allowSelfSigned: provider === 'proton' }
+		return { host, port, security, username, password, allowSelfSigned: false }
 	}
 
 	private normalizeEmail(email: string): string {

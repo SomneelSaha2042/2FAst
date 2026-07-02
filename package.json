@@ -12,7 +12,7 @@
     "clean:release": "node scripts/clean.mjs release",
     "build": "corepack pnpm run clean && vite build --config vite.config.ts && tsc -b src/main/tsconfig.json && tsc -b src/preload/tsconfig.json",
     "dist": "corepack pnpm run build && corepack pnpm run clean:release && node scripts/package.mjs",
-    "verify": "tsc -b src/shared/tsconfig.json src/main/tsconfig.json src/preload/tsconfig.json --noEmit && tsc --noEmit -p src/renderer/tsconfig.json && eslint . && vitest run",
+    "verify": "tsc -b src/shared/tsconfig.json src/main/tsconfig.json src/preload/tsconfig.json && tsc --noEmit -p src/renderer/tsconfig.json && eslint . && vitest run",
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run"

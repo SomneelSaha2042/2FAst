@@ -9,11 +9,11 @@ describe('provider registry', () => {
 	})
 
 	it('maps branded IMAP providers to shared capabilities', () => {
-		const yahoo = getProviderDescriptor('yahoo')
-		expect(yahoo?.transport).toBe('imap')
-		expect(yahoo?.capabilities.folders).toBe(true)
-		expect(yahoo?.capabilities.threads).toBe(false)
-		expect(isProvider('proton')).toBe(true)
+		const zoho = getProviderDescriptor('zoho')
+		expect(zoho?.transport).toBe('imap')
+		expect(zoho?.capabilities.folders).toBe(true)
+		expect(zoho?.capabilities.threads).toBe(false)
+		expect(isProvider('zoho')).toBe(true)
 		expect(isProvider('unknown')).toBe(false)
 	})
 })

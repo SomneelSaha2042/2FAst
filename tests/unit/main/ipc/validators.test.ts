@@ -18,7 +18,7 @@ describe('IPC account validators', () => {
 
 	it('rejects malformed providers, credentials, hosts, ports, and encryption', () => {
 		expect(isAccountAddRequest({ authentication: 'oauth', provider: 'unknown' })).toBe(false)
-		expect(isAccountAddRequest({ authentication: 'app-password', provider: 'yahoo', email: '', username: '', password: '' })).toBe(false)
+		expect(isAccountAddRequest({ authentication: 'app-password', provider: 'zoho', email: '', username: '', password: '' })).toBe(false)
 		expect(isAccountAddRequest({ authentication: 'app-password', provider: 'imap', email: 'user@example.com', username: 'user', password: 'secret', host: 'https://imap.example.com', port: 0, security: 'none' })).toBe(false)
 	})
 

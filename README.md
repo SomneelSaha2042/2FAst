@@ -8,13 +8,13 @@
 ![Tests](https://img.shields.io/badge/tests-71%20passing-brightgreen)
 ![Version](https://img.shields.io/badge/version-0.9.0--beta.1-blue)
 
-2Fast is a tray-first desktop utility for finding one-time passwords in Gmail, Outlook, and secure IMAP accounts without opening a full mail client. Connect your accounts, pick the mailbox you are waiting on, and 2Fast scans the latest messages for OTP-style codes so you can copy them quickly.
+2Fast is a tray-first desktop utility for finding one-time passwords in Gmail, Outlook, Zoho Mail, and secure Custom IMAP accounts without opening a full mail client. Connect your accounts, pick the mailbox you are waiting on, and 2Fast scans the latest messages for OTP-style codes so you can copy them quickly.
 
 The current beta is focused on a small, practical workflow: link accounts, reconnect them when tokens expire, scan recent messages on demand, and keep a short-lived OTP history in the tray.
 
 ## Features
 
-- Multi-account Gmail, Outlook, Yahoo, iCloud, Fastmail, Zoho, Proton Bridge, and custom IMAP linking
+- Multi-account Gmail, Outlook, Zoho Mail, and Custom IMAP linking (fully verified and supported)
 - Bring-your-own Google OAuth client setup for Gmail
 - Microsoft public-client OAuth with PKCE for Outlook
 - On-demand OTP scans from the tray account menu

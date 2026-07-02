@@ -3,7 +3,7 @@ import type { IpcApi, IpcResult, OtpSettings } from '../../shared/ipc-api.js'
 import { accountManager } from '../accounts/account-manager.js'
 import type { Account, ProviderCapabilities, ProviderDescriptor } from '../../shared/models.js'
 import { PROVIDER_REGISTRY, getProviderDescriptor } from '../../shared/provider-registry.js'
-import { deleteGoogleOAuthConfig, hasValidGoogleOAuthConfig, saveGoogleOAuthConfig } from '../oauth/google-config.js'
+import { deleteGoogleOAuthConfig, saveGoogleOAuthConfig, loadGoogleOAuthConfig } from '../oauth/google-config.js'
 import { cancelActiveOAuthFlow } from '../oauth/oauth-handler.js'
 import { cancelActiveMicrosoftOAuthFlow } from '../oauth/microsoft-auth.js'
 import type { OtpPollService } from '../otp/poll-service.js'
@@ -12,7 +12,10 @@ import { setAutoLaunch } from '../startup.js'
 import { isAccountAddRequest, isImapReconnectRequest } from './validators.js'
 
 const notImplemented = (): IpcResult<never> => ({ success: false, error: 'Not implemented' })
-const formatError = (error: unknown): IpcResult<never> => ({ success: false, error: error instanceof Error ? error.message : 'Unknown error' })
+const formatError = (error: unknown): IpcResult<never> => {
+	console.error('[IPC ERROR]:', error)
+	return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+}
 const unsupportedOrNotImplemented = (accountId: unknown, capability: keyof ProviderCapabilities): IpcResult<never> => {
 	if (typeof accountId !== 'string' || accountId.length === 0) return formatError(new Error('Invalid accountId for mail operation'))
 	const account = accountManager.getAccount(accountId)
@@ -81,8 +84,11 @@ export const setOnOpenSettings = (callback: () => void): void => {
 }
 
 const registerIpcHandlers = (): void => {
-	ipcMain.handle('oauth:getGoogleConfigStatus', async (): Promise<IpcResult<{ configured: boolean }>> => {
-		try { return { success: true, data: { configured: hasValidGoogleOAuthConfig() } } } catch (error) { return formatError(error) }
+	ipcMain.handle('oauth:getGoogleConfigStatus', async (): Promise<IpcResult<{ configured: boolean; email?: string }>> => {
+		try {
+			const config = await loadGoogleOAuthConfig()
+			return { success: true, data: { configured: config !== null, email: config?.email } }
+		} catch (error) { return formatError(error) }
 	})
 	ipcMain.handle('oauth:saveGoogleConfig', async (_event, config: unknown): Promise<IpcResult<{ path: string }>> => {
 		try {

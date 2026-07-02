@@ -114,7 +114,7 @@ export interface OtpSettings {
 }
 
 export interface IpcApi {
-	'oauth:getGoogleConfigStatus': () => Promise<IpcResult<{ configured: boolean }>>
+	'oauth:getGoogleConfigStatus': () => Promise<IpcResult<{ configured: boolean; email?: string }>>
 	'oauth:saveGoogleConfig': (
 		config: GoogleOAuthConfigInput
 	) => Promise<IpcResult<{ path: string }>>

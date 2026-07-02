@@ -233,14 +233,14 @@ describe('account manager', () => {
 		const manager = new AccountManager()
 		const added = await manager.addAccount({
 			authentication: 'app-password',
-			provider: 'yahoo',
-			email: 'USER@yahoo.com',
-			username: 'user@yahoo.com',
+			provider: 'zoho',
+			email: 'USER@zoho.com',
+			username: 'user@zoho.com',
 			password: 'app-password',
 		})
-		expect(added).toMatchObject({ provider: 'yahoo', email: 'user@yahoo.com' })
-		expect(imapProviderConstructorMock).toHaveBeenCalledWith(added.id, 'yahoo', expect.objectContaining({
-			host: 'imap.mail.yahoo.com',
+		expect(added).toMatchObject({ provider: 'zoho', email: 'user@zoho.com' })
+		expect(imapProviderConstructorMock).toHaveBeenCalledWith(added.id, 'zoho', expect.objectContaining({
+			host: 'imap.zoho.com',
 			port: 993,
 			allowSelfSigned: false,
 		}))
@@ -248,23 +248,15 @@ describe('account manager', () => {
 		expect(saveImapCredentialsMock).toHaveBeenCalledWith(added.id, expect.objectContaining({ password: 'app-password' }))
 	})
 
-	it('rejects preset server overrides and non-loopback Proton overrides', async () => {
+	it('rejects preset server overrides', async () => {
 		const { AccountManager } = await import('../../../../src/main/accounts/account-manager')
 		const manager = new AccountManager()
 		await expect(manager.addAccount({
 			authentication: 'app-password',
-			provider: 'yahoo',
-			email: 'user@yahoo.com',
-			username: 'user@yahoo.com',
+			provider: 'zoho',
+			email: 'user@zoho.com',
+			username: 'user@zoho.com',
 			password: 'app-password',
-			host: 'evil.example.com',
-		})).rejects.toThrow('cannot override')
-		await expect(manager.addAccount({
-			authentication: 'app-password',
-			provider: 'proton',
-			email: 'user@proton.me',
-			username: 'bridge-user',
-			password: 'bridge-password',
 			host: 'evil.example.com',
 		})).rejects.toThrow('cannot override')
 	})
