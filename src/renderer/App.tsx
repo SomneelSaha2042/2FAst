@@ -24,13 +24,13 @@ const getApi = (): Window['api'] | null =>
 const getEvents = (): Window['events'] | null =>
 	(window as Window & { events?: Window['events'] }).events ?? null
 
-type AppView = 'settings' | 'gmail-setup' | 'preferences' | 'poll'
-type SettingsPage = Exclude<AppView, 'poll'>
+type AppView = 'settings' | 'gmail-setup' | 'preferences' | 'codes' | 'poll'
+type SettingsPage = 'settings' | 'gmail-setup' | 'preferences' | 'codes'
 
 const viewFromLocation = (): AppView => {
 	const params = new URLSearchParams(window.location.search)
 	const view = params.get('view')
-	if (view === 'poll' || view === 'gmail-setup' || view === 'preferences') {
+	if (view === 'poll' || view === 'gmail-setup' || view === 'preferences' || view === 'codes') {
 		return view
 	}
 	return 'settings'
@@ -141,6 +141,176 @@ const initialSettingsState: SettingsState = {
 	providers: [],
 	settings: DEFAULT_SETTINGS,
 	gmailConfigured: false,
+}
+
+/**
+ * CodesDashboard Component: Handles Scanning and Displaying OTP Codes
+ * inside the large main dashboard panel.
+ */
+function CodesDashboard(props: { readonly accounts: readonly Account[] }): ReactElement {
+	const [selectedAccountId, setSelectedAccountId] = useState<string>(props.accounts[0]?.id || '')
+	const [scanState, setScanState] = useState<PollState>('idle')
+	const [candidates, setCandidates] = useState<readonly OtpResult[]>([])
+	const [copiedCode, setCopiedCode] = useState<string | null>(null)
+	const [error, setError] = useState<string | null>(null)
+
+	const selectedAccount = useMemo(() =>
+		props.accounts.find((a) => a.id === selectedAccountId) || props.accounts[0],
+	[props.accounts, selectedAccountId])
+
+	const runScan = useCallback(async (accountId: string): Promise<void> => {
+		const api = getApi()
+		if (!api) {
+			setError('Preload bridge unavailable.')
+			setScanState('error')
+			return
+		}
+		setScanState('scanning')
+		setCopiedCode(null)
+		setError(null)
+		try {
+			const result = await api['poll:scanAccount'](accountId)
+			if (!result.success || !result.data) {
+				setError(result.error ?? 'Failed to inspect latest emails')
+				setScanState('error')
+				return
+			}
+			setCandidates(result.data)
+			setScanState('complete')
+		} catch (requestError) {
+			const message = requestError instanceof Error ? requestError.message : 'Failed to inspect emails'
+			setError(message)
+			setScanState('error')
+		}
+	}, [])
+
+	useEffect(() => {
+		if (selectedAccount) {
+			void runScan(selectedAccount.id)
+		}
+	}, [selectedAccount, runScan])
+
+	const copyCandidate = async (candidate: OtpResult): Promise<void> => {
+		try {
+			await navigator.clipboard.writeText(candidate.code)
+			setCopiedCode(candidate.code)
+		} catch (clipboardError) {
+			setError(clipboardError instanceof Error ? clipboardError.message : 'Failed to copy code')
+		}
+	}
+
+	return (
+		<div className="grid grid-cols-[220px_1fr] gap-6 items-start">
+			{/* Accounts list selection */}
+			<div className="flex flex-col gap-2">
+				<span className="text-[10px] font-bold text-outline uppercase tracking-wider select-none mb-1 text-left">Select Account</span>
+				{props.accounts.map((account) => (
+					<button
+						key={account.id}
+						type="button"
+						className={`p-3 rounded-lg flex flex-col items-start gap-1 transition-all text-left cursor-pointer border ${
+							selectedAccountId === account.id
+								? 'bg-primary/10 border-primary text-primary'
+								: 'bg-surface-container border-outline-variant/20 text-outline hover:text-on-surface-variant hover:bg-surface-variant/30'
+						}`}
+						onClick={() => setSelectedAccountId(account.id)}
+					>
+						<span className="text-xs font-semibold truncate w-full">{account.email}</span>
+						<span className="text-[10px] opacity-75">{providerLabel(account.provider)}</span>
+					</button>
+				))}
+			</div>
+
+			{/* Scan Feed Panel */}
+			<div className="space-y-4">
+				{selectedAccount && (
+					<>
+						{/* Active scan status */}
+						<div className="glass-panel rounded-xl p-4 relative overflow-hidden">
+							<div className="flex items-center justify-between">
+								<div className="flex items-center gap-3">
+									<div className={`relative w-10 h-10 flex items-center justify-center rounded-full bg-primary/10 text-primary ${scanState === 'scanning' ? 'animate-pulse' : ''}`}>
+										<span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>mail</span>
+									</div>
+									<div className="text-left">
+										<p className="text-sm font-semibold text-on-surface">
+											{scanState === 'scanning' ? 'Scanning Feed...' : scanState === 'error' ? 'Scan Failed' : 'Scan Feed Complete'}
+										</p>
+										<p className="text-xs text-outline">{selectedAccount.email}</p>
+									</div>
+								</div>
+								<button
+									type="button"
+									disabled={scanState === 'scanning'}
+									className="px-4 py-1.5 bg-primary-container hover:brightness-110 active:scale-[0.98] text-on-primary-container font-semibold rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 text-xs cursor-pointer"
+									onClick={() => void runScan(selectedAccount.id)}
+								>
+									<span className="material-symbols-outlined text-xs">sync</span>
+									Scan Again
+								</button>
+							</div>
+							{scanState === 'scanning' && (
+								<div className="mt-3.5 h-1 w-full bg-surface-container-highest rounded-full overflow-hidden">
+									<div className="h-full bg-primary-container animate-pulse" style={{ width: '70%' }}></div>
+								</div>
+							)}
+						</div>
+
+						{/* Error messaging */}
+						{scanState === 'error' && (
+							<div className="glass-panel rounded-xl p-4 border-l-2 border-l-error text-left">
+								<p className="text-sm font-semibold text-on-surface">Failed to retrieve codes</p>
+								<p className="text-xs text-red-300 mt-1">{error || 'Unknown error occurred'}</p>
+							</div>
+						)}
+
+						{/* Candidates codes list */}
+						<div className="space-y-2 text-left">
+							<div className="flex items-center justify-between mb-1 select-none">
+								<span className="text-[10px] font-bold text-outline uppercase tracking-wider">Latest 5 Scan</span>
+								<span className="text-[10px] font-bold text-primary/60 uppercase tracking-wider">Active Codes</span>
+							</div>
+
+							<div className="space-y-2">
+								{candidates.map((candidate, idx) => (
+									<div
+										key={`${candidate.source.messageId}-${candidate.code}-${idx}`}
+										className={`glass-panel p-3 rounded-lg flex items-center justify-between transition-all group glow-hover ${
+											idx === 0 ? 'border-l-2 border-l-primary' : ''
+										}`}
+									>
+										<div className="flex flex-col min-w-0">
+											<span className="font-bold text-on-surface leading-tight text-lg tracking-wider font-code-otp select-text">{candidate.code}</span>
+											<span className="text-xs text-outline mt-0.5 truncate max-w-[320px]">{candidate.source.sender}</span>
+											<span className="text-[10px] text-outline/60 mt-0.5 truncate max-w-[320px]">
+												{formatTimestamp(candidate.source.receivedAt)} - {candidate.source.subject}
+											</span>
+										</div>
+										<button
+											type="button"
+											title={copiedCode === candidate.code ? 'Copied' : 'Copy code'}
+											className="text-primary hover:text-white transition-colors cursor-pointer p-1.5 rounded hover:bg-surface-container-highest shrink-0"
+											onClick={() => void copyCandidate(candidate)}
+										>
+											<span className="material-symbols-outlined text-[18px]">
+												{copiedCode === candidate.code ? 'check' : 'content_copy'}
+											</span>
+										</button>
+									</div>
+								))}
+								{scanState === 'complete' && candidates.length === 0 && (
+									<p className="text-xs text-outline text-center py-6 bg-surface-container/30 rounded-lg">No OTP codes found in the latest emails.</p>
+								)}
+								{scanState === 'idle' && (
+									<p className="text-xs text-outline text-center py-6 bg-surface-container/30 rounded-lg">Scanning email inbox...</p>
+								)}
+							</div>
+						</div>
+					</>
+				)}
+			</div>
+		</div>
+	)
 }
 
 /**
@@ -391,24 +561,36 @@ function SettingsView(): ReactElement {
 
 	const intervals = [5000, 10000, 15000, 30000, 60000]
 	const ttlValues = [5, 10, 15, 30]
-	const pageTitle = page === 'gmail-setup' ? 'Gmail Setup' : page === 'preferences' ? 'Preferences' : 'Settings'
+	const pageTitle = page === 'gmail-setup' ? 'Gmail Setup' : page === 'preferences' ? 'Preferences' : page === 'codes' ? 'Codes Feed' : 'Settings'
 
 	return (
 		<WindowChrome title={pageTitle} view={page}>
 			<div className="flex flex-1 mt-8 h-[calc(720px-32px)] overflow-hidden">
-				{/* SideNavBar (Visible on Settings & Preferences views) */}
+				{/* SideNavBar (Visible on Settings, Codes & Preferences views) */}
 				{page !== 'gmail-setup' && (
-					<aside className="h-full w-20 flex flex-col items-center py-6 gap-stack-gap bg-surface/80 backdrop-blur-xl border-r border-outline-variant/15 shrink-0 z-20">
+					<aside className="h-full w-20 flex flex-col items-center py-6 bg-surface/80 backdrop-blur-xl border-r border-outline-variant/15 shrink-0 z-20 select-none">
 						<div className="flex flex-col items-center gap-1 mb-6">
 							<span className="material-symbols-outlined text-primary text-[28px]">lock_open</span>
 							<span className="text-[9px] text-outline text-center uppercase tracking-widest font-bold">Secure</span>
 						</div>
-						<div className="flex flex-col gap-5 w-full px-2">
+						<div className="flex flex-col gap-4 w-full px-2">
+							<button
+								type="button"
+								className={`flex flex-col items-center gap-1 py-3 transition-all duration-200 rounded-lg cursor-pointer ${
+									page === 'codes'
+										? 'text-primary bg-primary/10 font-semibold'
+										: 'text-outline hover:text-on-surface-variant hover:bg-surface-variant/30'
+								}`}
+								onClick={() => navigateToPage('codes')}
+							>
+								<span className="material-symbols-outlined text-[22px]">qr_code_2</span>
+								<span className="text-[10px] font-bold uppercase tracking-wider mt-1">Codes</span>
+							</button>
 							<button
 								type="button"
 								className={`flex flex-col items-center gap-1 py-3 transition-all duration-200 rounded-lg cursor-pointer ${
 									page === 'settings'
-										? 'text-primary bg-primary/10'
+										? 'text-primary bg-primary/10 font-semibold'
 										: 'text-outline hover:text-on-surface-variant hover:bg-surface-variant/30'
 								}`}
 								onClick={() => navigateToPage('settings')}
@@ -483,7 +665,7 @@ function SettingsView(): ReactElement {
 							{page === 'settings' ? (
 								<>
 									{/* Screen Title */}
-									<div>
+									<div className="text-left">
 										<h1 className="text-headline-md text-on-surface mb-2 font-semibold">Account Management</h1>
 										<p className="text-body-base text-outline">Connect your email providers to automatically sync 2FA tokens and security alerts.</p>
 									</div>
@@ -513,7 +695,7 @@ function SettingsView(): ReactElement {
 									</section>
 
 									{/* List of accounts connected */}
-									<section className="flex flex-col gap-3">
+									<section className="flex flex-col gap-3 text-left">
 										<h2 className="text-label-caps text-outline uppercase tracking-[0.15em] font-bold">Connected Services</h2>
 										{grouped.map((group) => (
 											<div key={group.descriptor.id} className="space-y-3">
@@ -565,7 +747,7 @@ function SettingsView(): ReactElement {
 											<h2 className="text-label-caps text-outline uppercase tracking-[0.15em] font-bold shrink-0">Add IMAP Account</h2>
 											<div className="h-[1px] flex-1 bg-outline-variant/30"></div>
 										</div>
-										<div className="grid grid-cols-2 gap-x-6 gap-y-4">
+										<div className="grid grid-cols-2 gap-x-6 gap-y-4 text-left">
 											<div className="flex flex-col gap-input-gap">
 												<label className="text-label-caps text-outline ml-1">PROVIDER</label>
 												<select
@@ -667,16 +849,35 @@ function SettingsView(): ReactElement {
 								</>
 							) : null}
 
+							{page === 'codes' ? (
+								<div className="text-left">
+									{state.accounts.length === 0 ? (
+										<div className="glass-panel p-6 rounded-xl text-center">
+											<h1 className="text-headline-md text-on-surface mb-2 font-semibold">Security Codes Feed</h1>
+											<p className="text-body-base text-outline">No accounts connected yet. Please connect an account first under the Accounts tab.</p>
+										</div>
+									) : (
+										<>
+											<div className="mb-6">
+												<h1 className="text-headline-md text-on-surface mb-2 font-semibold">Security Codes Feed</h1>
+												<p className="text-body-base text-outline">Select a connected account to scan and retrieve the latest OTP codes.</p>
+											</div>
+											<CodesDashboard accounts={state.accounts} />
+										</>
+									)}
+								</div>
+							) : null}
+
 							{page === 'gmail-setup' ? (
 								<>
 									{/* Wizard Screen Header */}
-									<div>
+									<div className="text-left">
 										<h1 className="text-headline-md text-on-surface mb-2 font-semibold">Connect your Gmail API</h1>
 										<p className="text-body-base text-on-surface-variant leading-relaxed">Follow these steps to generate your own API credentials. This ensures your data stays private and your rate limits are dedicated only to your account.</p>
 									</div>
 
 									{/* Step-by-step setup details */}
-									<div className="space-y-6 mb-28">
+									<div className="space-y-6 mb-28 text-left">
 										{[
 											{ step: 1, title: 'Log In', text: 'Log in with the Google account you want to link in 2Fast.' },
 											{ step: 2, title: 'Open Google Console', text: 'Open the Google Cloud Console for that account.' },
@@ -779,7 +980,7 @@ function SettingsView(): ReactElement {
 							{page === 'preferences' ? (
 								<>
 									{/* Screen Header */}
-									<div>
+									<div className="text-left">
 										<h1 className="text-headline-md text-on-surface font-semibold">Application Settings</h1>
 										<p className="text-body-base text-outline">Configure how 2Fast handles your secure tokens and app behavior.</p>
 									</div>
@@ -1026,12 +1227,21 @@ function PollView(): ReactElement {
 		<WindowChrome title={title} subtitle={target?.email} view="poll">
 			<div className="flex flex-1 mt-8 h-[calc(520px-32px)] overflow-hidden">
 				{/* SideNavBar (Compact version for Tray OTP feed) */}
-				<nav className="h-full w-16 bg-surface/80 backdrop-blur-xl border-r border-outline-variant/15 flex flex-col items-center py-4 gap-4 z-40 shrink-0 select-none">
-					<button type="button" className="w-10 h-10 flex items-center justify-center text-primary bg-primary/10 rounded-lg transition-all duration-200 cursor-default">
+				<nav className="h-full w-16 bg-surface/80 backdrop-blur-xl border-r border-outline-variant/15 flex flex-col items-center py-4 gap-4 z-40 shrink-0 select-none animate-fade-in">
+					<button
+						type="button"
+						disabled={scanState === 'scanning'}
+						title="Scan Feed"
+						className="w-10 h-10 flex items-center justify-center text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-all duration-200 cursor-pointer disabled:opacity-50"
+						onClick={() => {
+							if (target) void runScan(target, { force: true })
+						}}
+					>
 						<span className="material-symbols-outlined">lock_open</span>
 					</button>
 					<button
 						type="button"
+						title="Open Settings"
 						className="w-10 h-10 flex items-center justify-center text-outline hover:text-on-surface-variant hover:bg-surface-variant/30 rounded-lg transition-all duration-200 cursor-pointer"
 						onClick={() => {
 							const api = getApi()
