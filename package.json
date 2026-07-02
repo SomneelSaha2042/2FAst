@@ -7,7 +7,7 @@
   "type": "module",
   "main": "dist/main/index.js",
   "scripts": {
-    "dev": "tsc -b src/main/tsconfig.json && tsc -b src/preload/tsconfig.json && concurrently \"vite --config vite.config.ts\" \"tsc -b src/main/tsconfig.json --watch\" \"tsc -b src/preload/tsconfig.json --watch\" \"set VITE_DEV_SERVER_URL=http://localhost:5173&& electron .\"",
+    "dev": "tsc -b src/main/tsconfig.json && tsc -b src/preload/tsconfig.json && concurrently -k \"vite --config vite.config.ts\" \"tsc -b src/main/tsconfig.json --watch\" \"tsc -b src/preload/tsconfig.json --watch\" \"electron .\"",
     "clean": "node scripts/clean.mjs dist",
     "clean:release": "node scripts/clean.mjs release",
     "build": "corepack pnpm run clean && vite build --config vite.config.ts && tsc -b src/main/tsconfig.json && tsc -b src/preload/tsconfig.json",

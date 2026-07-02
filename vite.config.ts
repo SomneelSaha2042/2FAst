@@ -6,6 +6,10 @@ export default defineConfig({
   root: 'src/renderer',
   base: './',
   plugins: [react(), tailwindcss()],
+  server: {
+    port: 5173,
+    strictPort: true,
+  },
   build: {
     outDir: '../../dist/renderer',
     emptyOutDir: true,

@@ -81,7 +81,7 @@ const loadRendererView = async (
 	view: 'settings' | 'poll',
 	payload?: PollStartPayload
 ): Promise<void> => {
-	const devServerUrl = process.env.VITE_DEV_SERVER_URL
+	const devServerUrl = process.env.VITE_DEV_SERVER_URL || (!app.isPackaged ? 'http://localhost:5173' : undefined)
 	const params = new URLSearchParams({ view })
 	if (payload) {
 		params.set('accountId', payload.accountId)
