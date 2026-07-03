@@ -2,7 +2,7 @@ import Store from 'electron-store'
 import { appendFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { accountManager } from '../accounts/account-manager.js'
-import type { Account } from '../../shared/models.js'
+import type { Account, Message } from '../../shared/models.js'
 import { buildOtpSource, extractOtp } from './patterns.js'
 import { handleOtpDetected } from './otp-actions.js'
 import { OtpStore, type OtpResult, type StoredOtp } from './otp-store.js'
@@ -52,6 +52,8 @@ export class OtpPollService {
 	private readonly onOtpDetected: (otp: StoredOtp) => void
 	private readonly onOtpExpired: (otpId: string) => void
 	private readonly onPollStatus: (status: PollStatus) => void
+	private readonly onScanStarted: () => void
+	private readonly onScanFinished: () => void
 	private readonly debugLoggingEnabled: boolean
 	private readonly logDirectory?: LogDirectoryProvider
 
@@ -60,6 +62,8 @@ export class OtpPollService {
 		readonly onOtpDetected?: (otp: StoredOtp) => void
 		readonly onOtpExpired?: (otpId: string) => void
 		readonly onPollStatus?: (status: PollStatus) => void
+		readonly onScanStarted?: () => void
+		readonly onScanFinished?: () => void
 		readonly debugLoggingEnabled?: boolean
 		readonly logDirectory?: LogDirectoryProvider
 	}) {
@@ -76,6 +80,8 @@ export class OtpPollService {
 		this.onOtpDetected = options?.onOtpDetected ?? (() => {})
 		this.onOtpExpired = options?.onOtpExpired ?? (() => {})
 		this.onPollStatus = options?.onPollStatus ?? (() => {})
+		this.onScanStarted = options?.onScanStarted ?? (() => {})
+		this.onScanFinished = options?.onScanFinished ?? (() => {})
 		this.debugLoggingEnabled = options?.debugLoggingEnabled ?? isPollDebugLoggingEnabled()
 		this.logDirectory = options?.logDirectory
 	}
@@ -174,7 +180,14 @@ export class OtpPollService {
 			return
 		}
 		const accounts = accountManager.listAccounts()
-		await Promise.all(accounts.map((account) => this.pollAccount(account)))
+		if (accounts.length > 0) {
+			this.onScanStarted()
+			try {
+				await Promise.all(accounts.map((account) => this.pollAccount(account)))
+			} finally {
+				this.onScanFinished()
+			}
+		}
 		this.persistSeenIds()
 	}
 
@@ -194,54 +207,93 @@ export class OtpPollService {
 		if (!account) {
 			throw new Error(`Account not found: ${accountId}`)
 		}
-		await this.pollAccount(account, { includeSeen: true })
+		this.onScanStarted()
+		try {
+			await this.pollAccount(account, { includeSeen: true })
+		} finally {
+			this.onScanFinished()
+		}
 		this.persistSeenIds()
 	}
 
+	private async fetchRecentMessages(account: Account, provider: Awaited<ReturnType<typeof accountManager.getProvider>>): Promise<Message[]> {
+		let folders: string[] | undefined = undefined
+		if (account.provider === 'outlook') {
+			folders = ['inbox', 'junkemail', 'deleteditems']
+		} else if (account.provider !== 'gmail') {
+			const all = await provider.listFolders()
+			folders = all.filter((f) => f.type === 'inbox' || f.type === 'junk' || f.type === 'trash').map((f) => f.id)
+			if (folders.length === 0) folders = undefined
+		}
+
+		if (!folders) {
+			const res = await provider.listMessages({ maxResults: this.config.maxEmailsPerPoll })
+			return res.messages
+		}
+
+		const combined: Message[] = []
+		for (const folderId of folders) {
+			try {
+				const res = await provider.listMessages({ maxResults: this.config.maxEmailsPerPoll, folderId })
+				combined.push(...res.messages)
+			} catch (e) {
+				console.error(`[POLL ERROR] Folder retrieve failed for ${account.email} folder ${folderId}:`, e)
+				await this.writePollLog(`[${new Date().toISOString()}] poll:folder-error accountId=${account.id} folderId=${folderId} error=${e instanceof Error ? e.message : String(e)}`)
+			}
+		}
+		
+		combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+		const sliced = combined.slice(0, this.config.maxEmailsPerPoll)
+		return sliced
+	}
+
 	/**
-	 * Scans the latest configured messages for OTP-like codes without mutating OTP history.
-	 * @param accountId Internal account identifier.
-	 * @returns OTP candidates extracted from the latest message window.
+	 * Manually triggers a one-off deep scan of an account to find OTPs.
+	 * Bypasses the seen tracking completely.
+	 * @param accountId Target account ID.
+	 * @returns Array of valid OTPs found.
 	 */
 	async scanAccountById(accountId: string): Promise<OtpResult[]> {
 		const account = accountManager.getAccount(accountId)
-		if (!account) {
-			throw new Error(`Account not found: ${accountId}`)
-		}
-		await this.writePollLog(
-			`[${new Date().toISOString()}] scan:start accountId=${account.id} email=${account.email} provider=${account.provider}`
-		)
-		const provider = await accountManager.getProvider(account.id)
-		const listResult = await provider.listMessages({
-			maxResults: this.config.maxEmailsPerPoll,
-		})
-		await this.writePollLog(
-			`[${new Date().toISOString()}] scan:list accountId=${account.id} count=${listResult.messages.length} maxResults=${this.config.maxEmailsPerPoll}`
-		)
+		if (!account) throw new Error('Account not found')
 
-		const results: OtpResult[] = []
-		for (const item of listResult.messages) {
+		this.onScanStarted()
+		try {
 			await this.writePollLog(
-				`[${new Date().toISOString()}] scan:item accountId=${account.id} messageId=${item.id} date=${item.date} from=${item.from.email} subjectLength=${item.subject.length}`
+				`[${new Date().toISOString()}] scan:start accountId=${account.id} email=${account.email} provider=${account.provider}`
 			)
-			const message = await provider.getMessage(item.id)
-			const extracted = extractOtp(message.subject, message.bodyText ?? '', message.bodyHtml ?? '')
-			if (!extracted) {
+			const provider = await accountManager.getProvider(account.id)
+			const messages = await this.fetchRecentMessages(account, provider)
+			await this.writePollLog(
+				`[${new Date().toISOString()}] scan:list accountId=${account.id} count=${messages.length} maxResults=${this.config.maxEmailsPerPoll}`
+			)
+
+			const results: OtpResult[] = []
+			for (const item of messages) {
 				await this.writePollLog(
-					`[${new Date().toISOString()}] scan:no-otp accountId=${account.id} messageId=${message.id}`
+					`[${new Date().toISOString()}] scan:item accountId=${account.id} messageId=${item.id} date=${item.date} from=${item.from.email} subjectLength=${item.subject.length}`
 				)
-				continue
+				const message = await provider.getMessage(item.id)
+				const extracted = extractOtp(message.subject, message.bodyText ?? '', message.bodyHtml ?? '')
+				if (!extracted) {
+					await this.writePollLog(
+						`[${new Date().toISOString()}] scan:no-otp accountId=${account.id} messageId=${message.id}`
+					)
+					continue
+				}
+				const result: OtpResult = {
+					...extracted,
+					source: buildOtpSource(message),
+				}
+				results.push(result)
+				await this.writePollLog(
+					`[${new Date().toISOString()}] scan:otp-candidate accountId=${account.id} messageId=${message.id} code=${result.code} type=${result.type} confidence=${result.confidence}`
+				)
 			}
-			const result: OtpResult = {
-				...extracted,
-				source: buildOtpSource(message),
-			}
-			results.push(result)
-			await this.writePollLog(
-				`[${new Date().toISOString()}] scan:otp-candidate accountId=${account.id} messageId=${message.id} code=${result.code} type=${result.type} confidence=${result.confidence}`
-			)
+			return results
+		} finally {
+			this.onScanFinished()
 		}
-		return results
 	}
 
 	private async pollAccount(account: Account, options?: { readonly includeSeen?: boolean }): Promise<void> {
@@ -249,13 +301,11 @@ export class OtpPollService {
 			`[${new Date().toISOString()}] poll:start accountId=${account.id} email=${account.email} provider=${account.provider}`
 		)
 		const provider = await accountManager.getProvider(account.id)
-		const listResult = await provider.listMessages({
-			maxResults: this.config.maxEmailsPerPoll,
-		})
+		const messages = await this.fetchRecentMessages(account, provider)
 		await this.writePollLog(
-			`[${new Date().toISOString()}] poll:list accountId=${account.id} count=${listResult.messages.length} maxResults=${this.config.maxEmailsPerPoll}`
+			`[${new Date().toISOString()}] poll:list accountId=${account.id} count=${messages.length} maxResults=${this.config.maxEmailsPerPoll}`
 		)
-		for (const item of listResult.messages) {
+		for (const item of messages) {
 			await this.writePollLog(
 				`[${new Date().toISOString()}] poll:item accountId=${account.id} messageId=${item.id} date=${item.date} from=${item.from.email} subjectLength=${item.subject.length}`
 			)

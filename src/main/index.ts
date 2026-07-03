@@ -2,7 +2,7 @@ import { app, BrowserWindow, Menu } from 'electron'
 import Store from 'electron-store'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { setMainWindowForIpc, setOtpPollService } from './ipc/index.js'
+import { setMainWindowForIpc, setOtpPollService, setOnOpenSettings } from './ipc/index.js'
 import { loadGoogleOAuthConfig } from './oauth/google-config.js'
 import { OtpPollService } from './otp/poll-service.js'
 import { TrayController } from './tray.js'
@@ -62,20 +62,26 @@ const otpPollService = new OtpPollService({
 		pollWindow?.webContents.send('poll:status', status)
 		tray?.refreshMenu()
 	},
+	onScanStarted: () => {
+		tray?.onScanStarted()
+	},
+	onScanFinished: () => {
+		tray?.onScanFinished()
+	},
 })
 
 setOtpPollService(otpPollService)
 
 const rendererPath = (): string => join(app.getAppPath(), 'dist/renderer/index.html')
-const resourcesPath = (): string => app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
-const appIconPath = (): string => join(resourcesPath(), process.platform === 'win32' ? 'icon.ico' : 'icon.png')
+const assetsPath = (): string => app.isPackaged ? join(process.resourcesPath, 'assets') : join(app.getAppPath(), 'assets')
+const appIconPath = (): string => join(assetsPath(), '2FAst.png')
 
 const loadRendererView = async (
 	window: BrowserWindow,
 	view: 'settings' | 'poll',
 	payload?: PollStartPayload
 ): Promise<void> => {
-	const devServerUrl = process.env.VITE_DEV_SERVER_URL
+	const devServerUrl = process.env.VITE_DEV_SERVER_URL || (!app.isPackaged ? 'http://localhost:5173' : undefined)
 	const params = new URLSearchParams({ view })
 	if (payload) {
 		params.set('accountId', payload.accountId)
@@ -118,7 +124,7 @@ const createSettingsWindow = (): BrowserWindow => {
 			contextIsolation: true,
 			nodeIntegration: false,
 			sandbox: true,
-			preload: join(currentDir, '../preload/index.js'),
+			preload: join(currentDir, '../preload/index.cjs'),
 		},
 	})
 	setMainWindowForIpc(window)
@@ -156,7 +162,7 @@ const createPollWindow = (): BrowserWindow => {
 			contextIsolation: true,
 			nodeIntegration: false,
 			sandbox: true,
-			preload: join(currentDir, '../preload/index.js'),
+			preload: join(currentDir, '../preload/index.cjs'),
 		},
 	})
 	setMainWindowForIpc(window)
@@ -225,6 +231,8 @@ app.whenReady().then(() => {
 			app.quit()
 		},
 	})
+
+	setOnOpenSettings(openSettingsWindow)
 
 	const settings = getOtpSettings()
 	setAutoLaunch(settings.launchOnStartup)

@@ -3,7 +3,6 @@ productName: 2Fast
 copyright: Copyright (c) 2026
 asar: true
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
-afterPack: scripts/after-pack.mjs
 
 directories:
   output: release
@@ -12,21 +11,22 @@ directories:
 files:
   - dist/**/*
   - package.json
+  - '!dist/**/*.d.ts'
+  - '!dist/**/*.tsbuildinfo'
 
 extraResources:
   - from: resources
     to: .
+  - from: assets
+    to: assets
     filter:
-      - icon.png
-      - icon.ico
-      - icon.icns
-      - tray-icon*.png
+      - 2FAst.png
 
 mac:
   target:
     - target: dmg
       arch: [x64, arm64]
-  icon: resources/icon.icns
+  icon: assets/2FAst.png
   category: public.app-category.utilities
   hardenedRuntime: true
   entitlements: resources/entitlements.mac.plist
@@ -36,7 +36,7 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  icon: resources/icon.ico
+  icon: assets/2FAst.png
   executableName: 2Fast
   signAndEditExecutable: false
 
@@ -44,12 +44,9 @@ linux:
   target:
     - target: AppImage
       arch: [x64]
-  icon: resources/icon.png
+  icon: assets/2FAst.png
   category: Utility
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  installerIcon: resources/icon.ico
-  uninstallerIcon: resources/icon.ico
-  installerHeaderIcon: resources/icon.ico

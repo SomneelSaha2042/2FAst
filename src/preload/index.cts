@@ -13,9 +13,10 @@ const api: { [K in keyof IpcApi]: IpcApi[K] } = {
 	'oauth:saveGoogleConfig': (config) => ipcRenderer.invoke('oauth:saveGoogleConfig', config),
 	'oauth:deleteGoogleConfig': () => ipcRenderer.invoke('oauth:deleteGoogleConfig'),
 	'oauth:cancelFlow': () => ipcRenderer.invoke('oauth:cancelFlow'),
+	'providers:list': () => ipcRenderer.invoke('providers:list'),
 	'accounts:list': () => ipcRenderer.invoke('accounts:list'),
-	'accounts:add': (provider) => ipcRenderer.invoke('accounts:add', provider),
-	'accounts:reconnect': (accountId) => ipcRenderer.invoke('accounts:reconnect', accountId),
+	'accounts:add': (request) => ipcRenderer.invoke('accounts:add', request),
+	'accounts:reconnect': (accountId, request) => ipcRenderer.invoke('accounts:reconnect', accountId, request),
 	'accounts:remove': (accountId) => ipcRenderer.invoke('accounts:remove', accountId),
 	'mail:listMessages': (accountId, options) => ipcRenderer.invoke('mail:listMessages', accountId, options),
 	'mail:getMessage': (accountId, messageId) => ipcRenderer.invoke('mail:getMessage', accountId, messageId),
@@ -39,6 +40,7 @@ const api: { [K in keyof IpcApi]: IpcApi[K] } = {
 	'settings:update': (settings) => ipcRenderer.invoke('settings:update', settings),
 	'window:hide': () => ipcRenderer.invoke('window:hide'),
 	'window:minimize': () => ipcRenderer.invoke('window:minimize'),
+	'window:openSettings': () => ipcRenderer.invoke('window:openSettings'),
 }
 
 const events: EventApi = {

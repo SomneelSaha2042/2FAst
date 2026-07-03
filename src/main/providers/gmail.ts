@@ -178,9 +178,10 @@ export class GmailProvider implements MailProvider {
 		const response = await gmail.users.messages.list({
 			userId: 'me',
 			labelIds: options?.labelId ? [options.labelId] : undefined,
-			q: queryParts.length > 0 ? queryParts.join(' ') : undefined,
+			q: queryParts.length > 0 ? queryParts.join(' ') : (options?.labelId ? undefined : 'in:inbox OR in:spam OR in:trash'),
 			pageToken: options?.pageToken,
 			maxResults: options?.maxResults ?? DEFAULT_MAX_RESULTS,
+			includeSpamTrash: true,
 		})
 		const ids = response.data.messages ?? []
 		const detailed = await Promise.all(

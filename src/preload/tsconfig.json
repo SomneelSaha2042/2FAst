@@ -7,5 +7,6 @@
     "moduleResolution": "node",
     "ignoreDeprecations": "6.0"
   },
-  "include": ["./**/*", "../shared/**/*"]
+  "include": ["./**/*"],
+  "references": [{ "path": "../shared" }]
 }

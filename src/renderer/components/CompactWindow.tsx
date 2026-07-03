@@ -15,9 +15,9 @@ interface CompactWindowProps {
 export default function CompactWindow(props: CompactWindowProps): ReactElement {
 	return (
 		<main style={{ minHeight: '100vh', background: '#f2f6fb', color: '#0f172a', fontFamily: '"Segoe UI", sans-serif' }}>
-			<header style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px', background: '#111827', color: '#e2e8f0', ['-webkit-app-region' as string]: 'drag' }}>
+			<header style={{ height: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px', background: '#111827', color: '#e2e8f0', ['WebkitAppRegion' as string]: 'drag' }}>
 				<strong style={{ fontSize: 13, letterSpacing: 0.2 }}>2Fast</strong>
-				<div style={{ display: 'flex', gap: 6, ['-webkit-app-region' as string]: 'no-drag' }}>
+				<div style={{ display: 'flex', gap: 6, ['WebkitAppRegion' as string]: 'no-drag' }}>
 					<button type="button" onClick={props.onMinimize} style={{ border: '1px solid #334155', background: '#1f2937', color: '#e2e8f0', borderRadius: 6, width: 24, height: 22, cursor: 'pointer' }}>-</button>
 					<button type="button" onClick={props.onClose} style={{ border: '1px solid #334155', background: '#1f2937', color: '#e2e8f0', borderRadius: 6, width: 24, height: 22, cursor: 'pointer' }}>x</button>
 				</div>

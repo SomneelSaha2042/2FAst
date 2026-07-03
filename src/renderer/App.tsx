@@ -1,7 +1,8 @@
-import type { CSSProperties, ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { OtpResult, OtpSettings, PollStartPayload } from '../shared/ipc-api'
-import type { Account, Provider } from '../shared/models'
+import type { AccountAddRequest, ImapReconnectRequest, OtpResult, OtpSettings, PollStartPayload } from '../shared/ipc-api'
+import type { Account, ImapSecurity, Provider, ProviderDescriptor } from '../shared/models'
+import { getProviderDescriptor, isProvider } from '../shared/provider-registry'
 
 const BYOC_GUIDE_URL = 'https://developers.google.com/identity/protocols/oauth2/native-app'
 const GOOGLE_CONSOLE_URL = 'https://console.cloud.google.com/'
@@ -23,13 +24,13 @@ const getApi = (): Window['api'] | null =>
 const getEvents = (): Window['events'] | null =>
 	(window as Window & { events?: Window['events'] }).events ?? null
 
-type AppView = 'settings' | 'gmail-setup' | 'preferences' | 'poll'
-type SettingsPage = Exclude<AppView, 'poll'>
+type AppView = 'settings' | 'add-account' | 'gmail-setup' | 'preferences' | 'codes' | 'poll'
+type SettingsPage = 'settings' | 'add-account' | 'gmail-setup' | 'preferences' | 'codes'
 
 const viewFromLocation = (): AppView => {
 	const params = new URLSearchParams(window.location.search)
 	const view = params.get('view')
-	if (view === 'poll' || view === 'gmail-setup' || view === 'preferences') {
+	if (view === 'poll' || view === 'gmail-setup' || view === 'add-account' || view === 'preferences' || view === 'codes') {
 		return view
 	}
 	return 'settings'
@@ -45,7 +46,7 @@ const pollPayloadFromLocation = (): PollStartPayload | null => {
 	const accountId = params.get('accountId')
 	const email = params.get('email')
 	const provider = params.get('provider')
-	if (!accountId || !email || (provider !== 'gmail' && provider !== 'outlook')) {
+	if (!accountId || !email || !isProvider(provider)) {
 		return null
 	}
 	return { accountId, email, provider }
@@ -58,89 +59,25 @@ const automaticPollScans = {
 	completedKeys: new Set<string>(),
 }
 
-const shellStyle: CSSProperties = {
-	minHeight: '100vh',
-	background: 'rgba(6, 10, 20, 0.82)',
-	color: '#e5edf8',
-	fontFamily: '"Segoe UI", sans-serif',
-	backdropFilter: 'blur(20px)',
-	border: '1px solid rgba(148, 163, 184, 0.2)',
-	borderRadius: 16,
-	boxShadow: '0 22px 70px rgba(0, 0, 0, 0.38)',
-	boxSizing: 'border-box',
-	overflow: 'hidden',
-}
-
-const panelStyle: CSSProperties = {
-	background: 'rgba(15, 23, 42, 0.72)',
-	border: '1px solid rgba(148, 163, 184, 0.22)',
-	borderRadius: 8,
-	padding: 16,
-	boxShadow: '0 18px 42px rgba(0, 0, 0, 0.24)',
-}
-
-const rowPanelStyle: CSSProperties = {
-	...panelStyle,
-	padding: 12,
-	display: 'flex',
-	alignItems: 'center',
-	justifyContent: 'space-between',
-	gap: 12,
-}
-
-const buttonStyle: CSSProperties = {
-	border: '1px solid rgba(148, 163, 184, 0.34)',
-	borderRadius: 8,
-	padding: '9px 12px',
-	background: 'rgba(15, 23, 42, 0.68)',
-	color: '#dbeafe',
-	fontWeight: 650,
-	cursor: 'pointer',
-	display: 'inline-flex',
-	alignItems: 'center',
-	gap: 7,
-}
-
-const primaryButtonStyle: CSSProperties = {
-	...buttonStyle,
-	border: '1px solid rgba(56, 189, 248, 0.65)',
-	background: 'rgba(14, 165, 233, 0.2)',
-	color: '#e0f2fe',
-}
-
-const dangerButtonStyle: CSSProperties = {
-	...buttonStyle,
-	border: '1px solid rgba(248, 113, 113, 0.48)',
-	color: '#fecaca',
-}
-
-const inputStyle: CSSProperties = {
-	width: '100%',
-	marginTop: 6,
-	padding: 10,
-	borderRadius: 8,
-	border: '1px solid rgba(148, 163, 184, 0.32)',
-	background: 'rgba(2, 6, 23, 0.56)',
-	color: '#e5edf8',
-	boxSizing: 'border-box',
-}
-
 interface WindowChromeProps {
 	readonly title: string
 	readonly subtitle?: string
 	readonly children: ReactElement
+	readonly view: AppView
 }
 
 interface SettingsState {
 	readonly accounts: readonly Account[]
+	readonly providers: readonly ProviderDescriptor[]
 	readonly settings: OtpSettings
 	readonly gmailConfigured: boolean
+	readonly gmailConfigEmail?: string
 }
 
 type PollState = 'idle' | 'scanning' | 'complete' | 'error'
 type GmailSaveState = 'idle' | 'saving' | 'saved' | 'error'
 
-const providerLabel = (provider: Provider): string => provider === 'gmail' ? 'Gmail' : 'Outlook'
+const providerLabel = (provider: Provider): string => getProviderDescriptor(provider)?.displayName ?? provider
 
 const shortClientId = (clientId: string): string => {
 	const [prefix] = clientId.split('.')
@@ -156,175 +93,248 @@ const formatTimestamp = (iso: string): string =>
 		second: '2-digit',
 	})
 
-const iconButtonStyle: CSSProperties = {
-	...buttonStyle,
-	width: 30,
-	height: 28,
-	padding: 0,
-	justifyContent: 'center',
-}
-
-const compactIconButtonStyle: CSSProperties = {
-	...buttonStyle,
-	width: 32,
-	height: 32,
-	padding: 0,
-	justifyContent: 'center',
-	borderRadius: 8,
-}
-
-const linkChipStyle: CSSProperties = {
-	display: 'inline-flex',
-	alignItems: 'center',
-	gap: 8,
-	border: '1px solid rgba(148, 163, 184, 0.24)',
-	borderRadius: 8,
-	padding: '6px 6px 6px 10px',
-	background: 'rgba(2, 6, 23, 0.34)',
-	color: '#cbd5e1',
-	fontSize: 13,
-	fontWeight: 650,
-}
-
-const setupStepStyle: CSSProperties = {
-	display: 'grid',
-	gridTemplateColumns: '28px 1fr',
-	gap: 10,
-	alignItems: 'start',
-}
-
-const setupStepNumberStyle: CSSProperties = {
-	width: 24,
-	height: 24,
-	borderRadius: 8,
-	display: 'inline-flex',
-	alignItems: 'center',
-	justifyContent: 'center',
-	background: 'rgba(14, 165, 233, 0.18)',
-	border: '1px solid rgba(56, 189, 248, 0.42)',
-	color: '#bae6fd',
-	fontSize: 12,
-	fontWeight: 800,
-}
-
 /**
  * Renders the frameless dark window shell used by all utility windows.
  * @param props Window chrome content.
  * @returns Window shell element.
  */
 function WindowChrome(props: WindowChromeProps): ReactElement {
-	const isPollWindow = props.title === 'OTP Check' || props.title.endsWith(' OTP')
+	const isPollWindow = props.view === 'poll'
+
+	const handleMinimize = () => {
+		const api = getApi()
+		if (api) void api['window:minimize']()
+	}
+
+	const handleClose = () => {
+		const api = getApi()
+		if (api) void api['window:hide']()
+	}
+
 	return (
-		<main style={shellStyle}>
-			<header style={{ height: 38, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px 0 14px', borderBottom: '1px solid rgba(148, 163, 184, 0.18)', ['-webkit-app-region' as string]: 'drag' }}>
-				<div>
-					<strong style={{ display: 'block', fontSize: 13 }}>2Fast</strong>
-					{props.subtitle ? <span style={{ display: 'block', marginTop: 1, color: '#94a3b8', fontSize: 11 }}>{props.subtitle}</span> : null}
+		<div className={`${isPollWindow ? 'w-[380px] h-[520px]' : 'w-[840px] h-[720px]'} bg-background text-on-surface flex flex-col relative overflow-hidden border border-outline-variant rounded-xl shadow-2xl`}>
+			{/* TopAppBar (Custom Title Bar) */}
+			<header className="fixed top-0 w-full h-8 flex items-center justify-between px-4 bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant z-50 select-none font-body-sm" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+				<div className="flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+					<img src="/2FAst.png" alt="2Fast Logo" className="w-5 h-5 object-contain" />
+					<span className="font-bold text-primary font-headline-md text-sm">2Fast</span>
+					<span className="text-outline text-[10px] uppercase tracking-widest ml-2 opacity-70">
+						{isPollWindow ? `~/2fast/feed` : `~/2fast/${props.view}`}
+					</span>
 				</div>
-				<div style={{ display: 'flex', gap: 6, ['-webkit-app-region' as string]: 'no-drag' }}>
-					<button type="button" aria-label="Minimize" style={iconButtonStyle} onClick={() => { const api = getApi(); if (api) void api['window:minimize']() }}>-</button>
-					<button type="button" aria-label="Close" style={iconButtonStyle} onClick={() => { const api = getApi(); if (api) void api['window:hide']() }}>x</button>
+				<div className="flex gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+					<button type="button" aria-label="Minimize" className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-variant transition-colors text-outline cursor-pointer" onClick={handleMinimize}>
+						<span className="material-symbols-outlined text-[16px]">remove</span>
+					</button>
+					<button type="button" aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded hover:bg-error-container hover:text-on-error-container transition-colors text-outline cursor-pointer" onClick={handleClose}>
+						<span className="material-symbols-outlined text-[16px]">close</span>
+					</button>
 				</div>
 			</header>
-			<section style={{ padding: isPollWindow ? 12 : 20 }}>
-				<h1 style={{ margin: '0 0 14px', fontSize: isPollWindow ? 16 : 24, letterSpacing: 0 }}>{props.title}</h1>
-				{props.children}
-			</section>
-		</main>
+
+			{/* Main Layout Area */}
+			{props.children}
+		</div>
 	)
 }
 
-const initialSettingsState: SettingsState = {
-	accounts: [],
-	settings: DEFAULT_SETTINGS,
-	gmailConfigured: false,
+function CopyLinkButton({ url, label, icon }: { readonly url: string; readonly label: string; readonly icon: string }): ReactElement {
+	const [copied, setCopied] = useState(false)
+	const handleCopy = async (): Promise<void> => {
+		try {
+			await navigator.clipboard.writeText(url)
+			setCopied(true)
+			setTimeout(() => setCopied(false), 2000)
+		} catch {
+			// ignore
+		}
+	}
+	return (
+		<button
+			type="button"
+			className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-outline-variant/50 text-on-surface hover:bg-surface-variant transition-all text-body-sm font-medium cursor-pointer"
+			onClick={() => void handleCopy()}
+			title={url}
+		>
+			<span className="material-symbols-outlined text-[16px] opacity-70">{icon}</span>
+			<span>{label}</span>
+			<span className={`material-symbols-outlined text-[14px] ml-1 ${copied ? 'text-green-400' : 'text-primary opacity-80'}`}>
+				{copied ? 'check' : 'content_copy'}
+			</span>
+		</button>
+	)
 }
 
 /**
- * Renders one provider account group inside settings.
- * @param props Provider group data and actions.
- * @returns Provider account section.
+ * CodesDashboard Component: Handles Scanning and Displaying OTP Codes
+ * inside the large main dashboard panel.
+ * @param props Component properties.
+ * @returns Dashboard element.
  */
-function ProviderAccounts(props: {
-	readonly title: string
-	readonly accounts: readonly Account[]
-	readonly onReconnectAccount: (account: Account) => Promise<void>
-	readonly onRemoveAccount: (account: Account) => Promise<void>
-}): ReactElement {
+function CodesDashboard(props: { readonly accounts: readonly Account[] }): ReactElement {
+	const [selectedAccountId, setSelectedAccountId] = useState<string>(props.accounts[0]?.id || '')
+	const [scanState, setScanState] = useState<PollState>('idle')
+	const [candidates, setCandidates] = useState<readonly OtpResult[]>([])
+	const [copiedCode, setCopiedCode] = useState<string | null>(null)
+	const [error, setError] = useState<string | null>(null)
+
+	const selectedAccount = useMemo(() =>
+		props.accounts.find((a) => a.id === selectedAccountId) || props.accounts[0],
+	[props.accounts, selectedAccountId])
+
+	const runScan = useCallback(async (accountId: string): Promise<void> => {
+		const api = getApi()
+		if (!api) {
+			setError('Preload bridge unavailable.')
+			setScanState('error')
+			return
+		}
+		setScanState('scanning')
+		setCandidates([])
+		setCopiedCode(null)
+		setError(null)
+		try {
+			const result = await api['poll:scanAccount'](accountId)
+			if (!result.success || !result.data) {
+				setError(result.error ?? 'Failed to inspect latest emails')
+				setScanState('error')
+				return
+			}
+			setCandidates(result.data)
+			setScanState('complete')
+		} catch (requestError) {
+			const message = requestError instanceof Error ? requestError.message : 'Failed to inspect emails'
+			setError(message)
+			setScanState('error')
+		}
+	}, [])
+
+	useEffect(() => {
+		if (selectedAccount) {
+			void runScan(selectedAccount.id)
+		}
+	}, [selectedAccount, runScan])
+
+	const copyCandidate = async (candidate: OtpResult): Promise<void> => {
+		try {
+			await navigator.clipboard.writeText(candidate.code)
+			setCopiedCode(candidate.code)
+		} catch (clipboardError) {
+			setError(clipboardError instanceof Error ? clipboardError.message : 'Failed to copy code')
+		}
+	}
+
 	return (
-		<section style={panelStyle}>
-			<h2 style={{ margin: '0 0 10px', fontSize: 16 }}>{props.title}</h2>
-			{props.accounts.length === 0 ? <p style={{ margin: 0, color: '#94a3b8' }}>No accounts connected.</p> : (
-				<div style={{ display: 'grid', gap: 8 }}>
-					{props.accounts.map((account) => (
-						<div key={account.id} style={rowPanelStyle}>
-							<div>
-								<strong style={{ display: 'block', fontSize: 14 }}>{account.email}</strong>
-								<span style={{ color: '#94a3b8', fontSize: 12 }}>{account.displayName || providerLabel(account.provider)}</span>
-								{account.provider === 'gmail' ? (
-									<span style={{ display: 'block', color: '#64748b', fontSize: 11, marginTop: 2 }}>
-										OAuth client: {account.oauthClientId ? shortClientId(account.oauthClientId) : 'current saved BYOC client'}
-									</span>
-								) : null}
+		<div className="grid grid-cols-[220px_1fr] gap-6 items-start">
+			{/* Accounts list selection */}
+			<div className="flex flex-col gap-2">
+				<span className="font-label-md text-outline uppercase tracking-wider select-none mb-1 text-left">Select Account</span>
+				{props.accounts.map((account) => (
+					<button
+						key={account.id}
+						type="button"
+						className={`p-3 rounded flex flex-col items-start gap-1 transition-all text-left cursor-pointer border ${
+							selectedAccountId === account.id
+								? 'bg-secondary-container border-secondary text-secondary'
+								: 'bg-surface-container border-outline-variant text-outline hover:text-on-surface-variant hover:bg-surface-variant/30'
+						}`}
+						onClick={() => setSelectedAccountId(account.id)}
+					>
+						<span className="text-xs font-semibold truncate w-full">{account.email}</span>
+						<span className="text-[10px] opacity-75">{providerLabel(account.provider)}</span>
+					</button>
+				))}
+			</div>
+
+			{/* Scan Feed Panel */}
+			<div className="space-y-4">
+				{selectedAccount && (
+					<>
+						{/* Active scan status */}
+						<div className="warp-block rounded p-4 relative overflow-hidden border border-outline-variant/30 bg-surface-container/40">
+							<div className="flex items-center justify-between">
+								<div className="flex items-center gap-3">
+									<div className={`relative w-10 h-10 flex items-center justify-center rounded bg-secondary-container text-secondary ${scanState === 'scanning' ? 'animate-pulse' : ''}`}>
+										<span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>mail</span>
+									</div>
+									<div className="text-left">
+										<p className="font-body-sm text-on-surface flex items-center gap-2">
+											{scanState === 'scanning' ? 'Scanning Feed...' : scanState === 'error' ? 'Scan Failed' : 'Scan Feed Complete'}
+											{scanState === 'scanning' && <span className="w-1.5 h-3.5 bg-primary terminal-blink inline-block"></span>}
+										</p>
+										<p className="font-body-sm text-outline text-[11px] mt-1">{selectedAccount.email}</p>
+									</div>
+								</div>
+								<button
+									type="button"
+									disabled={scanState === 'scanning'}
+									className="px-4 py-1.5 bg-surface border border-outline-variant hover:bg-surface-variant transition-colors font-label-md text-on-surface cursor-pointer flex items-center gap-2"
+									onClick={() => void runScan(selectedAccount.id)}
+								>
+									<span className="material-symbols-outlined text-xs">sync</span>
+									Scan Again
+								</button>
 							</div>
-							<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-								<button type="button" style={buttonStyle} onClick={() => void props.onReconnectAccount(account)}>
-									Reconnect
-								</button>
-								<button type="button" style={dangerButtonStyle} onClick={() => void props.onRemoveAccount(account)}>
-									Remove
-								</button>
+							{scanState === 'scanning' && (
+								<div className="mt-3.5 h-[2px] w-full bg-surface-container-highest overflow-hidden">
+									<div className="h-full bg-primary animate-pulse" style={{ width: '70%' }}></div>
+								</div>
+							)}
+						</div>
+
+						{/* Error messaging */}
+						{scanState === 'error' && (
+							<div className="terminal-block p-4 rounded-lg border-l-2 border-l-error text-left">
+								<p className="font-body-md font-semibold text-on-surface">Failed to retrieve codes</p>
+								<p className="font-body-sm text-red-300 mt-1">{error || 'Unknown error occurred'}</p>
+							</div>
+						)}
+
+						{/* Candidates codes list */}
+						<div className="space-y-2 text-left">
+							<div className="flex items-center justify-end mb-1 select-none">
+								<span className="font-label-md text-secondary/80 uppercase tracking-wider">LIVE</span>
+							</div>
+
+							<div className="space-y-2">
+								{candidates.map((candidate, idx) => (
+									<div
+										key={`${candidate.source.messageId}-${candidate.code}-${idx}`}
+										className={`rounded p-3 flex items-center justify-between transition-all group cursor-pointer ${
+											idx === 0 ? 'warp-block-active' : 'warp-block opacity-80 hover:opacity-100'
+										}`}
+									>
+										<div className="flex flex-col gap-1 min-w-0">
+											<span className={`font-code-otp text-code-otp leading-tight select-text ${idx === 0 ? 'text-primary' : 'text-on-surface-variant'}`}>{candidate.code}</span>
+											<span className="font-body-sm text-outline text-[11px] mt-0.5 truncate max-w-[320px]">{candidate.source.sender}</span>
+											<span className="font-body-sm text-outline/60 text-[10px] truncate max-w-[320px]">
+												{formatTimestamp(candidate.source.receivedAt)} - {candidate.source.subject}
+											</span>
+										</div>
+										<button
+											type="button"
+											title={copiedCode === candidate.code ? 'Copied' : 'Copy code'}
+											className="text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-2 rounded hover:bg-surface-bright shrink-0"
+											onClick={() => void copyCandidate(candidate)}
+										>
+											<span className="material-symbols-outlined text-[18px]">
+												{copiedCode === candidate.code ? 'check' : 'content_copy'}
+											</span>
+										</button>
+									</div>
+								))}
+								{scanState === 'complete' && candidates.length === 0 && (
+									<p className="font-body-sm text-outline text-center py-6 bg-surface-container/30 rounded-lg">No OTP codes found in the latest emails.</p>
+								)}
+								{scanState === 'idle' && (
+									<p className="font-body-sm text-outline text-center py-6 bg-surface-container/30 rounded-lg">Scanning email inbox...</p>
+								)}
 							</div>
 						</div>
-					))}
-				</div>
-			)}
-		</section>
-	)
-}
-
-/**
- * Renders a compact copy icon.
- * @returns Copy icon element.
- */
-function CopyIcon(): ReactElement {
-	return (
-		<svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-			<rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-			<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-		</svg>
-	)
-}
-
-/**
- * Renders a compact check icon.
- * @returns Check icon element.
- */
-function CheckIcon(): ReactElement {
-	return (
-		<svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-			<path d="M20 6 9 17l-5-5" />
-		</svg>
-	)
-}
-
-/**
- * Renders a compact icon button for copying setup links.
- * @param props Link label and copy action.
- * @returns Copy-link chip element.
- */
-function CopyLinkChip(props: {
-	readonly label: string
-	readonly ariaLabel: string
-	readonly onCopy: () => Promise<void>
-}): ReactElement {
-	return (
-		<span style={linkChipStyle}>
-			<span>{props.label}</span>
-			<button type="button" title={props.ariaLabel} aria-label={props.ariaLabel} style={compactIconButtonStyle} onClick={() => void props.onCopy()}>
-				<CopyIcon />
-			</button>
-		</span>
+					</>
+				)}
+			</div>
+		</div>
 	)
 }
 
@@ -345,11 +355,72 @@ function SettingsView(): ReactElement {
 	const [clientId, setClientId] = useState<string>('')
 	const [clientSecret, setClientSecret] = useState<string>('')
 	const [projectId, setProjectId] = useState<string>('')
+	const [imapProvider, setImapProvider] = useState<Exclude<Provider, 'gmail' | 'outlook'>>('zoho')
+	const [imapEmail, setImapEmail] = useState<string>('')
+	const [imapUsername, setImapUsername] = useState<string>('')
+	const [imapPassword, setImapPassword] = useState<string>('')
+	const [imapHost, setImapHost] = useState<string>('')
+	const [imapPort, setImapPort] = useState<string>('993')
+	const [imapSecurity, setImapSecurity] = useState<ImapSecurity>('tls')
+	const [selectedVendor, setSelectedVendor] = useState<Provider>('gmail')
+	const [hasManuallyEditedHost, setHasManuallyEditedHost] = useState<boolean>(false)
 
-	const grouped = useMemo(() => ({
-		gmail: state.accounts.filter((account) => account.provider === 'gmail'),
-		outlook: state.accounts.filter((account) => account.provider === 'outlook'),
-	}), [state.accounts])
+	const grouped = useMemo(() =>
+		state.providers
+			.map((descriptor) => ({
+				descriptor,
+				accounts: state.accounts.filter((account) => account.provider === descriptor.id),
+			}))
+			.filter((group) => group.accounts.length > 0 || group.descriptor.id === 'gmail' || group.descriptor.id === 'outlook'),
+	[state.accounts, state.providers])
+
+	const imapDescriptors = useMemo(() =>
+		state.providers.filter((descriptor) => descriptor.transport === 'imap'),
+	[state.providers])
+
+	const getZohoHostForEmail = (emailStr: string): string => {
+		const domain = emailStr.trim().split('@')[1]?.toLowerCase() || ''
+		if (domain.endsWith('.in')) return 'imap.zoho.in'
+		if (domain.endsWith('.eu')) return 'imap.zoho.eu'
+		if (domain.endsWith('.com.cn') || domain.endsWith('.cn')) return 'imap.zoho.com.cn'
+		return 'imap.zoho.com'
+	}
+
+	const handleVendorChange = (vendor: Provider) => {
+		setSelectedVendor(vendor)
+		setHasManuallyEditedHost(false)
+		if (vendor !== 'gmail' && vendor !== 'outlook') {
+			setImapProvider(vendor)
+		}
+	}
+
+	const handleHostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		setImapHost(e.target.value)
+		setHasManuallyEditedHost(true)
+	}
+
+	useEffect(() => {
+		if (page === 'gmail-setup') {
+			setPage('add-account')
+			setSelectedVendor('gmail')
+		}
+	}, [page])
+
+	useEffect(() => {
+		if (hasManuallyEditedHost) return
+		if (imapProvider === 'zoho') {
+			setImapHost(getZohoHostForEmail(imapEmail))
+			setImapPort('993')
+			setImapSecurity('tls')
+		} else {
+			const desc = imapDescriptors.find((d) => d.id === imapProvider)
+			if (desc?.imapPreset) {
+				setImapHost(desc.imapPreset.host)
+				setImapPort(String(desc.imapPreset.port))
+				setImapSecurity(desc.imapPreset.security)
+			}
+		}
+	}, [imapProvider, imapEmail, imapDescriptors, hasManuallyEditedHost])
 
 	const navigateToPage = (nextPage: SettingsPage): void => {
 		setPage(nextPage)
@@ -364,33 +435,27 @@ function SettingsView(): ReactElement {
 			setError('Preload bridge unavailable: window.api is undefined.')
 			return
 		}
-		const [accountsResult, settingsResult, gmailStatusResult] = await Promise.all([
+		const [accountsResult, providersResult, settingsResult, gmailStatusResult] = await Promise.all([
 			api['accounts:list'](),
+			api['providers:list'](),
 			api['settings:get'](),
 			api['oauth:getGoogleConfigStatus'](),
 		])
 		if (!accountsResult.success) setError(accountsResult.error ?? 'Failed to load accounts')
+		if (!providersResult.success) setError(providersResult.error ?? 'Failed to load providers')
 		if (!settingsResult.success) setError(settingsResult.error ?? 'Failed to load settings')
 		setState({
 			accounts: accountsResult.data ?? [],
+			providers: providersResult.data ?? [],
 			settings: settingsResult.data ?? DEFAULT_SETTINGS,
 			gmailConfigured: Boolean(gmailStatusResult.success && gmailStatusResult.data?.configured),
+			gmailConfigEmail: gmailStatusResult.success ? gmailStatusResult.data?.email : undefined,
 		})
 	}, [])
 
 	useEffect(() => {
 		void refresh()
 	}, [refresh])
-
-	const copyText = async (value: string, successMessage: string): Promise<void> => {
-		try {
-			await navigator.clipboard.writeText(value)
-			setStatus(successMessage)
-			setError(null)
-		} catch (clipboardError) {
-			setError(clipboardError instanceof Error ? clipboardError.message : 'Failed to copy to clipboard')
-		}
-	}
 
 	const updateSettings = async (partial: Partial<OtpSettings>): Promise<void> => {
 		const api = getApi()
@@ -404,15 +469,18 @@ function SettingsView(): ReactElement {
 		setStatus('Settings saved.')
 	}
 
-	const addAccount = async (provider: Provider): Promise<void> => {
+	const addAccount = async (request: AccountAddRequest): Promise<void> => {
 		const api = getApi()
 		if (!api) return
+		const provider = request.provider
 		setIsWorking(true)
-		setCanCancelConnection(true)
+		setCanCancelConnection(request.authentication === 'oauth')
 		setError(null)
-		setStatus(`Waiting for ${providerLabel(provider)} sign-in callback...`)
+		setStatus(request.authentication === 'oauth'
+			? `Waiting for ${providerLabel(provider)} sign-in callback...`
+			: `Testing ${providerLabel(provider)} IMAP connection...`)
 		try {
-			const result = await api['accounts:add'](provider)
+			const result = await api['accounts:add'](request)
 			if (!result.success || !result.data) throw new Error(result.error ?? 'Failed to add account')
 			setStatus(`Connected ${result.data.email}`)
 			await refresh()
@@ -427,6 +495,7 @@ function SettingsView(): ReactElement {
 		} finally {
 			setIsWorking(false)
 			setCanCancelConnection(false)
+			if (request.authentication === 'app-password') setImapPassword('')
 		}
 	}
 
@@ -448,10 +517,25 @@ function SettingsView(): ReactElement {
 		if (!state.gmailConfigured) {
 			setStatus('Save Gmail BYOC credentials before connecting Gmail.')
 			setError(null)
-			navigateToPage('gmail-setup')
+			setSelectedVendor('gmail')
+			navigateToPage('add-account')
 			return
 		}
-		await addAccount('gmail')
+		await addAccount({ authentication: 'oauth', provider: 'gmail' })
+	}
+
+	const addImapAccount = async (): Promise<void> => {
+		const customSettings = imapProvider === 'imap'
+			? { host: imapHost.trim(), port: Number(imapPort), security: imapSecurity }
+			: {}
+		await addAccount({
+			authentication: 'app-password',
+			provider: imapProvider,
+			email: imapEmail.trim(),
+			username: imapUsername.trim(),
+			password: imapPassword,
+			...customSettings,
+		})
 	}
 
 	const removeAccount = async (account: Account): Promise<void> => {
@@ -475,12 +559,21 @@ function SettingsView(): ReactElement {
 	const reconnectAccount = async (account: Account): Promise<void> => {
 		const api = getApi()
 		if (!api) return
+		let reconnectRequest: ImapReconnectRequest | undefined
+		const descriptor = getProviderDescriptor(account.provider)
+		if (descriptor?.transport === 'imap') {
+			const password = window.prompt(`Enter a new app password for ${account.email}:`)
+			if (!password) return
+			const username = window.prompt(`Enter the IMAP username for ${account.email}:`, account.email)
+			if (!username) return
+			reconnectRequest = { authentication: 'app-password', username, password }
+		}
 		setIsWorking(true)
-		setCanCancelConnection(true)
+		setCanCancelConnection(descriptor?.authentication === 'oauth')
 		setError(null)
 		setStatus(`Reconnecting ${account.email}...`)
 		try {
-			const result = await api['accounts:reconnect'](account.id)
+			const result = await api['accounts:reconnect'](account.id, reconnectRequest)
 			if (!result.success || !result.data) throw new Error(result.error ?? 'Failed to reconnect account')
 			setStatus(`Reconnected ${result.data.email}.`)
 			await refresh()
@@ -517,6 +610,7 @@ function SettingsView(): ReactElement {
 			setGmailSaveState('saved')
 			setGmailSaveMessage(`Saved Gmail credentials to ${result.data.path}`)
 			await refresh()
+			setTimeout(() => navigateToPage('settings'), 1500)
 		} catch (requestError) {
 			const message = requestError instanceof Error ? requestError.message : 'Unknown error'
 			setGmailSaveState('error')
@@ -529,154 +623,649 @@ function SettingsView(): ReactElement {
 
 	const intervals = [5000, 10000, 15000, 30000, 60000]
 	const ttlValues = [5, 10, 15, 30]
-	const settingsSummary = [
-		`${state.settings.pollIntervalMs / 1000}s polling`,
-		`${state.settings.otpTtlMinutes} min OTP TTL`,
-		state.settings.autoCopyToClipboard ? 'auto-copy on' : 'auto-copy off',
-		state.settings.showNotifications ? 'notifications on' : 'notifications off',
-	].join(' - ')
-	const pageTitle = page === 'gmail-setup' ? 'Gmail Setup' : page === 'preferences' ? 'Preferences' : 'Settings'
+	const pageTitle = page === 'add-account' ? 'Add Account' : page === 'preferences' ? 'Preferences' : page === 'codes' ? 'Codes Feed' : 'Settings'
 
 	return (
-		<WindowChrome title={pageTitle} subtitle="Tray-first OTP utility">
-			<div style={{ display: 'grid', gap: 16 }}>
-				{page === 'settings' ? (
-					<>
-						<div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
-							<ProviderAccounts title="Gmail" accounts={grouped.gmail} onReconnectAccount={reconnectAccount} onRemoveAccount={removeAccount} />
-							<ProviderAccounts title="Outlook" accounts={grouped.outlook} onReconnectAccount={reconnectAccount} onRemoveAccount={removeAccount} />
-						</div>
+		<WindowChrome title={pageTitle} view={page}>
+			<div className="flex flex-1 mt-8 h-[calc(720px-32px)] overflow-hidden">
+				{/* SideNavBar */}
+				{page !== 'add-account' && (
+					<aside className="h-full w-20 flex flex-col items-center py-6 bg-surface-container-lowest border-r border-outline-variant shrink-0 z-20 select-none">
 
-						<section style={panelStyle}>
-							<h2 style={{ margin: '0 0 12px', fontSize: 17 }}>Account Management</h2>
-							<div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-								<button type="button" style={primaryButtonStyle} disabled={isWorking} onClick={() => void addGmailAccount()}>
-									Add Gmail
-								</button>
-								<button type="button" style={buttonStyle} disabled={isWorking} onClick={() => void addAccount('outlook')}>
-									Add Outlook
-								</button>
-							</div>
-						</section>
-
-						<div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-							<section style={panelStyle}>
-								<h2 style={{ margin: '0 0 8px', fontSize: 17 }}>Gmail BYOC</h2>
-								<p style={{ margin: '0 0 12px', color: '#94a3b8', lineHeight: 1.5 }}>
-									Status: {state.gmailConfigured ? 'configured' : 'not configured'}. Gmail setup, credentials, and troubleshooting live on their own page.
-								</p>
-								<button type="button" style={buttonStyle} onClick={() => navigateToPage('gmail-setup')}>
-									Manage Gmail Setup
-								</button>
-							</section>
-
-							<section style={panelStyle}>
-								<h2 style={{ margin: '0 0 8px', fontSize: 17 }}>Preferences</h2>
-								<p style={{ margin: '0 0 12px', color: '#94a3b8', lineHeight: 1.5 }}>
-									{settingsSummary}
-								</p>
-								<button type="button" style={buttonStyle} onClick={() => navigateToPage('preferences')}>
-									Open Preferences
-								</button>
-							</section>
-						</div>
-					</>
-				) : null}
-
-				{page === 'gmail-setup' ? (
-					<>
-						<div>
-							<button type="button" style={buttonStyle} onClick={() => navigateToPage('settings')}>
-								Back
+						<div className="flex flex-col gap-4 w-full px-2">
+							<button
+								type="button"
+								className={`flex flex-col items-center gap-1 py-3 transition-all duration-200 rounded-lg cursor-pointer ${
+									page === 'codes'
+										? 'text-secondary bg-secondary-container font-semibold'
+										: 'text-outline hover:text-on-surface hover:bg-surface-variant/30'
+								}`}
+								onClick={() => navigateToPage('codes')}
+							>
+								<span className="material-symbols-outlined text-[22px]">qr_code_2</span>
+								<span className="font-label-md text-[10px] mt-1">Codes</span>
+							</button>
+							<button
+								type="button"
+								className={`flex flex-col items-center gap-1 py-3 transition-all duration-200 rounded-lg cursor-pointer ${
+									page === 'settings'
+										? 'text-secondary bg-secondary-container font-semibold'
+										: 'text-outline hover:text-on-surface hover:bg-surface-variant/30'
+								}`}
+								onClick={() => navigateToPage('settings')}
+							>
+								<span className="material-symbols-outlined text-[22px]">settings</span>
+								<span className="font-label-md text-[10px] mt-1">Accounts</span>
+							</button>
+							<button
+								type="button"
+								className={`flex flex-col items-center gap-1 py-3 transition-all duration-200 rounded-lg cursor-pointer ${
+									page === 'preferences'
+										? 'text-secondary bg-secondary-container font-semibold'
+										: 'text-outline hover:text-on-surface hover:bg-surface-variant/30'
+								}`}
+								onClick={() => navigateToPage('preferences')}
+							>
+								<span className="material-symbols-outlined text-[22px]">tune</span>
+								<span className="font-label-md text-[10px] mt-1">Prefs</span>
 							</button>
 						</div>
-						<section style={panelStyle}>
-							<h2 style={{ margin: '0 0 10px', fontSize: 17 }}>Gmail Setup</h2>
-							<p style={{ margin: '0 0 10px', color: '#b6c4d6', lineHeight: 1.55 }}>
-								BYOC status: {state.gmailConfigured ? 'configured' : 'not configured'}
-							</p>
-							<p style={{ margin: '0 0 10px', color: '#94a3b8', lineHeight: 1.55 }}>
-								Open these links in a browser profile already logged into the Google account you want to connect.
-							</p>
-							<p style={{ margin: '0 0 10px', color: '#94a3b8', lineHeight: 1.55 }}>
-								Each Gmail account remembers the OAuth client used when it was linked. New links use the most recently saved BYOC credentials, while reconnect uses the client already bound to that account.
-							</p>
-							<ol style={{ margin: '0 0 14px', padding: 0, color: '#cbd5e1', lineHeight: 1.55, listStyle: 'none', display: 'grid', gap: 10 }}>
-								<li style={setupStepStyle}><span style={setupStepNumberStyle}>1</span><span>Log in with the Google account you want to link in 2Fast.</span></li>
-								<li style={setupStepStyle}><span style={setupStepNumberStyle}>2</span><span>Open Google Cloud Console for that account.</span></li>
-								<li style={setupStepStyle}><span style={setupStepNumberStyle}>3</span><span>Create a project named Personal, or use an existing project.</span></li>
-								<li style={setupStepStyle}><span style={setupStepNumberStyle}>4</span><span>Switch to the selected project and go to APIs and Services, then Credentials.</span></li>
-								<li style={setupStepStyle}><span style={setupStepNumberStyle}>5</span><span>Configure OAuth consent screen with app name 2FAst, support email set to your Gmail, audience set to External, and contact email set to your email.</span></li>
-								<li style={setupStepStyle}><span style={setupStepNumberStyle}>6</span><span>Go to Data Access, add scope <code style={{ color: '#e0f2fe' }}>https://www.googleapis.com/auth/gmail.readonly</code>, then update.</span></li>
-								<li style={setupStepStyle}><span style={setupStepNumberStyle}>7</span><span>Go to Enabled APIs and Services, search for Gmail API, and click Enable.</span></li>
-								<li style={setupStepStyle}><span style={setupStepNumberStyle}>8</span><span>Go to Audience and add your email as a test user.</span></li>
-								<li style={setupStepStyle}><span style={setupStepNumberStyle}>9</span><span>Go to Clients, click Create Client, set Application type to Desktop app, then create it.</span></li>
-								<li style={setupStepStyle}><span style={setupStepNumberStyle}>10</span><span>Copy the client ID and client secret into the fields below, then save credentials.</span></li>
-							</ol>
-							<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-								<CopyLinkChip label="Google Console" ariaLabel="Copy Google Console link" onCopy={() => copyText(GOOGLE_CONSOLE_URL, 'Google Console link copied.')} />
-								<CopyLinkChip label="Credentials" ariaLabel="Copy Google Credentials link" onCopy={() => copyText(GOOGLE_CREDENTIALS_URL, 'Credentials link copied.')} />
-								<CopyLinkChip label="OAuth Guide" ariaLabel="Copy OAuth guide link" onCopy={() => copyText(BYOC_GUIDE_URL, 'OAuth guide link copied.')} />
-							</div>
-							<div style={{ marginBottom: 14, color: '#94a3b8', fontSize: 13, lineHeight: 1.55 }}>
-								<p style={{ margin: '0 0 6px' }}>If Google blocks access, confirm the same email is listed under OAuth consent screen test users.</p>
-								<p style={{ margin: 0 }}>If Gmail requests fail after linking, confirm the Gmail API is enabled and the readonly Gmail scope was added before creating or reconnecting the account.</p>
-							</div>
-							<p style={{ margin: '0 0 10px', color: '#94a3b8', fontSize: 13, lineHeight: 1.55 }}>
-								The Gmail email is required so 2Fast can label the BYOC client and verify Google returns the same account during OAuth.
-							</p>
-							<div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-								<label>Gmail email<input type="email" required style={inputStyle} value={gmailEmail} onChange={(event) => setGmailEmail(event.target.value)} /></label>
-								<label>Client ID<input style={inputStyle} value={clientId} onChange={(event) => setClientId(event.target.value)} /></label>
-								<label>Client Secret<input type="password" style={inputStyle} value={clientSecret} onChange={(event) => setClientSecret(event.target.value)} /></label>
-								<label>Project ID optional<input style={inputStyle} value={projectId} onChange={(event) => setProjectId(event.target.value)} /></label>
-							</div>
-							<div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
-								<button type="button" style={primaryButtonStyle} disabled={isWorking || !gmailEmail.trim() || !clientId.trim() || !clientSecret.trim()} onClick={() => void saveByocConfig()}>
-									{gmailSaveState === 'saving' ? 'Saving...' : 'Save Credentials'}
-								</button>
-								{gmailSaveMessage ? (
-									<span role={gmailSaveState === 'error' ? 'alert' : 'status'} style={{ color: gmailSaveState === 'error' ? '#fca5a5' : '#86efac', fontSize: 13, fontWeight: 650 }}>
-										{gmailSaveState === 'saved' ? <CheckIcon /> : null}
-										<span style={{ marginLeft: gmailSaveState === 'saved' ? 6 : 0 }}>{gmailSaveMessage}</span>
-									</span>
-								) : null}
-							</div>
-						</section>
-					</>
-				) : null}
+					</aside>
+				)}
 
-				{page === 'preferences' ? (
-					<>
-						<div>
-							<button type="button" style={buttonStyle} onClick={() => navigateToPage('settings')}>
-								Back
+				{/* Main Content Pane */}
+				<div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+					{/* Secondary navigation for Wizard Views */}
+					{(page === 'add-account') && (
+						<div className="px-6 py-4 flex items-center justify-between border-b border-outline-variant/30 shrink-0 z-40 relative bg-surface">
+							<button
+								type="button"
+								className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-variant text-outline hover:text-on-surface transition-all duration-200 group font-label-md text-label-md cursor-pointer"
+								onClick={() => navigateToPage('settings')}
+							>
+								<span className="material-symbols-outlined text-[18px] group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
+								<span>cd ../accounts</span>
 							</button>
+							{selectedVendor === 'gmail' && (
+								<div className="flex items-center gap-2">
+									<CopyLinkButton url={GOOGLE_CONSOLE_URL} label="Console" icon="open_in_new" />
+									<CopyLinkButton url={GOOGLE_CREDENTIALS_URL} label="Credentials" icon="key" />
+									<CopyLinkButton url={BYOC_GUIDE_URL} label="Docs" icon="menu_book" />
+								</div>
+							)}
 						</div>
-						<section style={panelStyle}>
-							<h2 style={{ margin: '0 0 12px', fontSize: 17 }}>Preferences</h2>
-							<div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
-								<label>Polling interval<select value={state.settings.pollIntervalMs} onChange={(event) => void updateSettings({ pollIntervalMs: Number(event.target.value) })} style={inputStyle}>{intervals.map((value) => <option key={value} value={value}>{value / 1000}s</option>)}</select></label>
-								<label>OTP expiry<select value={state.settings.otpTtlMinutes} onChange={(event) => void updateSettings({ otpTtlMinutes: Number(event.target.value) })} style={inputStyle}>{ttlValues.map((value) => <option key={value} value={value}>{value} min</option>)}</select></label>
-								<label>Sender allowlist<input value={(state.settings.filterSenders ?? []).join(', ')} onChange={(event) => void updateSettings({ filterSenders: event.target.value.split(',').map((item) => item.trim()).filter((item) => item.length > 0) })} style={inputStyle} /></label>
-							</div>
-							<div style={{ display: 'grid', gap: 9, marginTop: 14 }}>
-								<label><input type="checkbox" checked={state.settings.autoCopyToClipboard} onChange={(event) => void updateSettings({ autoCopyToClipboard: event.target.checked })} /> Auto-copy to clipboard</label>
-								<label><input type="checkbox" checked={state.settings.showNotifications} onChange={(event) => void updateSettings({ showNotifications: event.target.checked })} /> Notifications</label>
-								<label><input type="checkbox" checked={state.settings.soundEnabled} onChange={(event) => void updateSettings({ soundEnabled: event.target.checked })} /> Sound on detection</label>
-								<label><input type="checkbox" checked={state.settings.launchOnStartup} onChange={(event) => void updateSettings({ launchOnStartup: event.target.checked })} /> Launch on startup</label>
-							</div>
-						</section>
-					</>
-				) : null}
+					)}
 
-				{status ? <p style={{ margin: 0, color: '#86efac' }}>{status}</p> : null}
-				{error ? <p role="alert" style={{ margin: 0, color: '#fca5a5' }}>{error}</p> : null}
-				{canCancelConnection ? (
-					<button type="button" style={buttonStyle} onClick={() => void cancelConnection()}>
-						Cancel connection
-					</button>
-				) : null}
+					{/* Main Scrollable Canvas */}
+					<main className="flex-1 overflow-y-auto p-window-padding bg-background relative">
+						<div className="max-w-2xl mx-auto flex flex-col gap-6 relative z-10">
+							{page === 'settings' ? (
+								<>
+									<div className="text-left flex items-start justify-between border-b border-outline-variant pb-4 mb-4">
+										<div>
+											<h1 className="font-headline-lg text-headline-lg text-on-surface mb-2 font-semibold">Account Management</h1>
+											<p className="font-body-md text-outline">Connect your email providers to automatically sync 2FA tokens and security alerts.</p>
+										</div>
+										<button
+											type="button"
+											className="bg-primary hover:bg-primary-fixed text-on-primary font-bold px-6 py-3 rounded transition-all transform active:scale-95 flex items-center gap-2 cursor-pointer shrink-0 text-sm font-body-md"
+											onClick={() => navigateToPage('add-account')}
+										>
+											<span className="material-symbols-outlined text-sm">add</span>
+											Add Account
+										</button>
+									</div>
+
+									<section className="flex flex-col gap-3 text-left">
+										<h2 className="font-label-md text-outline uppercase tracking-widest">Connected Services</h2>
+										{grouped.map((group) => (
+											<div key={group.descriptor.id} className="space-y-3">
+												{group.accounts.map((account) => (
+													<div key={account.id} className="terminal-block p-4 rounded-lg flex items-center justify-between border-l-2 border-l-secondary group transition-all">
+														<div className="flex items-center gap-4">
+															<div className="w-10 h-10 rounded bg-surface-container-highest flex items-center justify-center border border-outline-variant">
+																<span className="material-symbols-outlined text-secondary">
+																	{account.provider === 'gmail' ? 'mail' : account.provider === 'outlook' ? 'work' : 'dns'}
+																</span>
+															</div>
+															<div>
+																<p className="font-body-md font-semibold text-on-surface">{account.email}</p>
+																<p className="font-body-sm text-outline mt-1">
+																	Provider: {providerLabel(account.provider)}
+																	{account.oauthClientId ? ` • Client: ${shortClientId(account.oauthClientId)}` : ''}
+																</p>
+															</div>
+														</div>
+														<div className="flex gap-2">
+															<button
+																type="button"
+																className="px-4 py-1.5 rounded bg-surface border border-outline-variant hover:bg-surface-variant transition-colors font-label-md text-on-surface cursor-pointer"
+																onClick={() => void reconnectAccount(account)}
+															>
+																Reconnect
+															</button>
+															<button
+																type="button"
+																className="px-4 py-1.5 rounded bg-surface border border-outline-variant hover:border-error hover:bg-error-container text-error transition-colors font-label-md cursor-pointer"
+																onClick={() => void removeAccount(account)}
+															>
+																Remove
+															</button>
+														</div>
+													</div>
+												))}
+											</div>
+										))}
+										{state.accounts.length === 0 && !state.gmailConfigured && (
+											<p className="font-body-base text-outline terminal-block p-4 rounded-lg">No accounts connected yet. Click Add Account to get started.</p>
+										)}
+										{state.gmailConfigured && state.gmailConfigEmail && !state.accounts.some(a => a.email.toLowerCase() === state.gmailConfigEmail!.toLowerCase() && a.provider === 'gmail') && (
+											<div className="terminal-block p-4 rounded-lg flex items-center justify-between border-l-2 border-l-secondary group transition-all mt-3">
+												<div className="flex items-center gap-4">
+													<div className="w-10 h-10 rounded bg-surface-container-highest flex items-center justify-center border border-outline-variant text-outline">
+														<span className="material-symbols-outlined">mail</span>
+													</div>
+													<div>
+														<p className="font-body-md font-semibold text-on-surface">{state.gmailConfigEmail}</p>
+														<p className="font-body-sm text-outline mt-1">
+															Provider: Google Workspace / Gmail • <span className="text-secondary font-semibold">Ready to Connect</span>
+														</p>
+													</div>
+												</div>
+												<div className="flex gap-2">
+													<button
+														type="button"
+														disabled={isWorking}
+														className="px-6 py-1.5 rounded bg-secondary-container text-secondary hover:bg-surface-variant border border-secondary transition-all font-label-md cursor-pointer disabled:opacity-50"
+														onClick={addGmailAccount}
+													>
+														Connect
+													</button>
+												</div>
+											</div>
+										)}
+									</section>
+								</>
+							) : null}
+
+							{page === 'add-account' ? (
+								<>
+									<div className="text-left mb-6 border-b border-outline-variant pb-4">
+										<h1 className="font-headline-lg text-headline-lg text-primary mb-2">&gt; Add New Account</h1>
+										<p className="font-body-md text-outline">Select a provider and follow the steps to connect your mailbox.</p>
+									</div>
+
+									{/* Dropdown Card */}
+									<div className="terminal-block p-6 rounded-lg text-left border border-outline-variant mb-6">
+										<div className="flex flex-col gap-input-gap">
+											<label className="font-label-md text-outline ml-1">SELECT VENDOR</label>
+											<select
+												className="w-full bg-surface-container-low border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none transition-all cursor-pointer font-semibold"
+												value={selectedVendor}
+												onChange={(e) => handleVendorChange(e.target.value as Provider)}
+											>
+												<option value="gmail">Google Workspace / Gmail</option>
+												<option value="outlook">Microsoft Outlook</option>
+												<option value="zoho">Zoho Mail (Verified IMAP)</option>
+												<option value="imap">Custom IMAP (Other Providers)</option>
+											</select>
+										</div>
+									</div>
+
+									{/* Conditional views */}
+									{selectedVendor === 'gmail' && (
+										<div className="space-y-6 text-left">
+											<div className="terminal-block p-5 rounded-lg border border-outline-variant mb-5 leading-relaxed text-sm bg-surface-container/20">
+												<h4 className="font-bold text-on-surface mb-2 flex items-center gap-1.5 font-headline-md">
+													<span className="material-symbols-outlined text-[18px] text-primary">info</span>
+													Gmail BYOC Setup Guide
+												</h4>
+												<p className="font-body-sm text-outline">
+													Follow these steps to generate your own Google Cloud client credentials. This keeps your data private and ensures you have dedicated API rate limits.
+												</p>
+											</div>
+
+											<div className="space-y-5 pb-6 border-b border-outline-variant/30">
+												{[
+													{ step: 1, title: 'Log In', text: 'Log in with the Google account you want to link in 2Fast.' },
+													{ step: 2, title: 'Open Google Console', text: 'Open the Google Cloud Console for that account.' },
+													{ step: 3, title: 'Create a Project', text: 'Create a project named "Personal", or use an existing project.' },
+													{ step: 4, title: 'Navigate to Credentials', text: 'Switch to the selected project and go to APIs and Services, then Credentials.' },
+													{ step: 5, title: 'Configure Consent Screen', text: 'Configure OAuth consent screen with app name 2FAst, support email set to your Gmail, audience set to External, and contact email set to your email.' },
+													{ step: 6, title: 'Add modify Scope', text: 'Go to Data Access, add scope "https://www.googleapis.com/auth/gmail.modify", then update.' },
+													{ step: 7, title: 'Enable Gmail API', text: 'Go to Enabled APIs and Services, search for Gmail API, and click Enable.' },
+													{ step: 8, title: 'Add Test User', text: 'Go to Audience and add your email as a test user.' },
+													{ step: 9, title: 'Create Desktop Client', text: 'Go to Clients, click Create Client, set Application type to Desktop app, then create it.' },
+													{ step: 10, title: 'Copy and Save', text: 'Copy the client ID and client secret into the fields below, then save credentials.' }
+												].map((item) => (
+													<div key={item.step} className="flex gap-4">
+														<div className="w-8 h-8 rounded bg-primary text-on-primary flex items-center justify-center font-bold text-body-md shrink-0 select-none shadow-[0_0_10px_rgba(201,198,197,0.3)]">
+															{item.step}
+														</div>
+														<div className="flex-1">
+															<h4 className="font-headline-md text-headline-md text-on-surface mb-0.5">{item.title}</h4>
+															<p className="font-body-sm text-outline leading-relaxed">{item.text}</p>
+														</div>
+													</div>
+												))}
+											</div>
+
+											{/* Setup Card Illustration / Placeholder */}
+											<div className="w-full h-48 rounded bg-surface-container border border-outline-variant flex items-center justify-center relative overflow-hidden mb-6">
+												<div className="absolute inset-0 opacity-20">
+													<div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuDd-mVRm1Z56VKeOR300R1o8f_CYDGwpKZD0btv4XW_sUJyIZVlMuyKk9FZHsWmVzfHSGBBlimUG0cWqjLNdjyGwEzY6cMGwkxojku1SMufGYVZkKZ9dwwRKeRbNiX1c23zV1OGdkfWEKst8aF6DYADZPvxgsMhFSO6TPG4DutT2zhf4ZrpJWxB9tDHfM1FfyaTFzd8cPLshpQqVPNKCRcg-J_g_u0WbjaUOdMYadYdM13DTdz8lHffpg')` }}></div>
+												</div>
+												<div className="relative z-10 flex flex-col items-center">
+													<span className="material-symbols-outlined text-primary text-[48px] mb-2" style={{ fontVariationSettings: "'FILL' 1" }}>terminal</span>
+													<span className="font-label-md text-label-md text-on-surface tracking-[0.2em] uppercase">Awaiting Input</span>
+												</div>
+											</div>
+
+											{/* Gmail BYOC config inputs */}
+											<div className="terminal-block p-6 rounded-lg border border-outline-variant space-y-4">
+												<h3 className="font-headline-md text-headline-md font-semibold text-on-surface mb-2">&gt; Gmail API Credentials</h3>
+												<div className="grid grid-cols-2 gap-4">
+													<div className="flex flex-col gap-input-gap">
+														<label className="font-label-md text-outline ml-1">GMAIL EMAIL</label>
+														<input
+															type="email"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
+															placeholder="user@gmail.com"
+															value={gmailEmail}
+															onChange={(e) => setGmailEmail(e.target.value)}
+														/>
+													</div>
+													<div className="flex flex-col gap-input-gap">
+														<label className="font-label-md text-outline ml-1">PROJECT ID (OPTIONAL)</label>
+														<input
+															type="text"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
+															placeholder="e.g. personal-project-123"
+															value={projectId}
+															onChange={(e) => setProjectId(e.target.value)}
+														/>
+													</div>
+													<div className="flex flex-col gap-input-gap col-span-2">
+														<label className="font-label-md text-outline ml-1">CLIENT ID</label>
+														<input
+															type="text"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
+															placeholder="000000000000-xxxxx.apps.googleusercontent.com"
+															value={clientId}
+															onChange={(e) => setClientId(e.target.value)}
+														/>
+													</div>
+													<div className="flex flex-col gap-input-gap col-span-2">
+														<label className="font-label-md text-outline ml-1">CLIENT SECRET</label>
+														<input
+															type="password"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
+															placeholder="••••••••••••••••••••"
+															value={clientSecret}
+															onChange={(e) => setClientSecret(e.target.value)}
+														/>
+													</div>
+												</div>
+												<div className="pt-2 flex items-center justify-between gap-4">
+													{gmailSaveMessage && (
+														<span role={gmailSaveState === 'error' ? 'alert' : 'status'} className={`text-xs font-semibold ${gmailSaveState === 'error' ? 'text-red-400' : 'text-green-400'}`}>
+															{gmailSaveMessage}
+														</span>
+													)}
+													<button
+														type="button"
+														disabled={isWorking || !gmailEmail.trim() || !clientId.trim() || !clientSecret.trim()}
+														className="ml-auto bg-primary hover:bg-primary-fixed text-on-primary font-bold px-8 py-2.5 rounded transition-all transform active:scale-95 flex items-center gap-2 font-body-md cursor-pointer disabled:opacity-50 text-sm"
+														onClick={saveByocConfig}
+													>
+														{gmailSaveState === 'saving' ? 'Saving...' : '> Authorize'}
+														<span className="material-symbols-outlined text-[18px]">keyboard_return</span>
+													</button>
+												</div>
+											</div>
+										</div>
+									)}
+
+									{selectedVendor === 'outlook' && (
+										<div className="terminal-block p-6 rounded-lg text-left border border-outline-variant flex flex-col gap-4">
+											<div className="flex items-center gap-3">
+												<span className="material-symbols-outlined text-primary text-[28px]">work</span>
+												<h3 className="font-headline-md text-headline-md font-semibold text-on-surface">Microsoft Outlook</h3>
+											</div>
+											<p className="font-body-md text-outline leading-relaxed">
+												Connect your Outlook, Hotmail, or Microsoft 365 account with one click using Microsoft OAuth.
+											</p>
+											<div className="pt-2">
+												<button
+													type="button"
+													disabled={isWorking}
+													className="w-full bg-secondary-container text-secondary border border-secondary font-headline-sm py-4 rounded hover:bg-surface-variant transition-all active:scale-[0.98] font-headline-md cursor-pointer flex items-center justify-center gap-2"
+													onClick={() => void addAccount({ authentication: 'oauth', provider: 'outlook' })}
+												>
+													<span className="material-symbols-outlined text-[20px]">login</span> Connect Outlook Account
+												</button>
+											</div>
+										</div>
+									)}
+
+									{selectedVendor !== 'gmail' && selectedVendor !== 'outlook' && (
+										<div className="space-y-4">
+											{/* Zoho custom instructions */}
+											{selectedVendor === 'zoho' && (
+												<div className="terminal-block p-5 rounded-lg border border-outline-variant leading-relaxed text-sm text-left">
+													<h4 className="font-bold text-on-surface mb-2 flex items-center gap-1.5 font-headline-md">
+														<span className="material-symbols-outlined text-[18px] text-primary">info</span>
+														Zoho Mail Setup Instructions (Custom IMAP)
+													</h4>
+													<ol className="list-decimal list-inside space-y-2 text-outline font-body-sm">
+														<li>
+															<strong>Enable IMAP Access</strong>: Sign in to Zoho Mail web interface → Open <strong>Settings</strong> → Go to <strong>Mail Accounts</strong> → Select your primary email address → Scroll to the <strong>IMAP</strong> section → Check <strong>IMAP Access</strong> → Click <strong>Save</strong>.
+														</li>
+														<li>
+															<strong>Generate App Password</strong>: Go to your Zoho Accounts dashboard (accounts.zoho.com) → Select <strong>Security</strong> → <strong>App passwords</strong> → Click <strong>Generate New Password</strong> → Enter the name <code className="bg-surface-container-highest px-1.5 py-0.5 rounded text-on-surface font-semibold text-xs border border-outline-variant/30">2FAST</code> and click <strong>Generate</strong>.
+														</li>
+														<li>
+															<strong>Enter Credentials</strong>:
+															<ul className="list-disc list-inside ml-5 mt-1 space-y-1">
+																<li><strong>Email Address</strong>: Enter your full Zoho email (e.g., <code className="text-on-surface font-mono">user@zoho.com</code>).</li>
+																<li><strong>IMAP Username</strong>: Must be your <strong className="text-on-surface">full email address</strong> (do not enter the app name "2FAST").</li>
+																<li><strong>App Password</strong>: Copy and paste the 16-character generated code <strong className="text-on-surface">without any spaces</strong>.</li>
+															</ul>
+														</li>
+													</ol>
+												</div>
+											)}
+
+											{/* Generic IMAP instructions */}
+											{selectedVendor === 'imap' && (
+												<div className="terminal-block p-5 rounded-lg border border-outline-variant leading-relaxed text-sm text-left">
+													<h4 className="font-bold text-on-surface mb-1.5 flex items-center gap-1.5 font-headline-md">
+														<span className="material-symbols-outlined text-[18px] text-primary">info</span>
+														Custom IMAP Setup
+													</h4>
+													<p className="font-body-sm text-outline">
+														Enter the secure incoming IMAP server credentials provided by your email host (Yahoo, iCloud, Fastmail, Proton Mail Bridge, or any private mail server).
+													</p>
+												</div>
+											)}
+
+											{/* IMAP Input Fields Card */}
+											<div className="terminal-block p-6 rounded-lg border border-outline-variant text-left">
+												<div className="grid grid-cols-2 gap-x-6 gap-y-4">
+													<div className="flex flex-col gap-input-gap">
+														<label className="font-label-md text-outline ml-1">EMAIL ADDRESS</label>
+														<input
+															type="email"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
+															placeholder="user@provider.com"
+															value={imapEmail}
+															onChange={(e) => {
+																setImapEmail(e.target.value)
+																if (!imapUsername) setImapUsername(e.target.value)
+															}}
+														/>
+													</div>
+													<div className="flex flex-col gap-input-gap">
+														<label className="font-label-md text-outline ml-1">IMAP USERNAME</label>
+														<input
+															type="text"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
+															placeholder="full email address or login name"
+															value={imapUsername}
+															onChange={(e) => setImapUsername(e.target.value)}
+														/>
+													</div>
+													<div className="flex flex-col gap-input-gap col-span-2">
+														<label className="font-label-md text-outline ml-1">APP PASSWORD</label>
+														<input
+															type="password"
+															autoComplete="new-password"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
+															placeholder="••••••••••••"
+															value={imapPassword}
+															onChange={(e) => setImapPassword(e.target.value)}
+														/>
+													</div>
+
+													<div className="flex flex-col gap-input-gap">
+														<label className="font-label-md text-outline ml-1">IMAP HOST</label>
+														<input
+															type="text"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
+															value={imapHost}
+															onChange={handleHostChange}
+														/>
+													</div>
+													<div className="flex flex-col gap-input-gap">
+														<label className="font-label-md text-outline ml-1">PORT</label>
+														<input
+															type="number"
+															min="1"
+															max="65535"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
+															value={imapPort}
+															onChange={(e) => setImapPort(e.target.value)}
+														/>
+													</div>
+													<div className="flex flex-col gap-input-gap col-span-2">
+														<label className="font-label-md text-outline ml-1">ENCRYPTION</label>
+														<select
+															className="w-full bg-surface-container-low border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none transition-all cursor-pointer"
+															value={imapSecurity}
+															onChange={(e) => setImapSecurity(e.target.value as ImapSecurity)}
+														>
+															<option value="tls">TLS (SSL/TLS)</option>
+															<option value="starttls">STARTTLS</option>
+														</select>
+													</div>
+
+													<div className="col-span-2 mt-2">
+														<button
+															type="button"
+															disabled={isWorking || !imapEmail.trim() || !imapUsername.trim() || !imapPassword || !imapHost.trim()}
+															className="w-full bg-secondary-container text-secondary border border-secondary font-headline-sm py-4 rounded hover:bg-surface-variant transition-all active:scale-[0.98] font-headline-md cursor-pointer disabled:opacity-50 text-sm"
+															onClick={addImapAccount}
+														>
+															Verify and Connect Account
+														</button>
+													</div>
+												</div>
+											</div>
+										</div>
+									)}
+								</>
+							) : null}
+
+							{page === 'codes' ? (
+								<div className="text-left">
+									{state.accounts.length === 0 ? (
+										<div className="terminal-block p-6 rounded-lg text-center border border-outline-variant">
+											<h1 className="font-headline-lg text-headline-lg text-on-surface mb-2 font-semibold">Security Codes Feed</h1>
+											<p className="font-body-base text-outline">No accounts connected yet. Please connect an account first under the Accounts tab.</p>
+										</div>
+									) : (
+										<>
+											<div className="mb-6 border-b border-outline-variant pb-4">
+												<h1 className="font-headline-lg text-headline-lg text-on-surface mb-2 font-semibold">Security Codes Feed</h1>
+												<p className="font-body-md text-outline">Select a connected account to scan and retrieve the latest OTP codes.</p>
+											</div>
+											<CodesDashboard accounts={state.accounts} />
+										</>
+									)}
+								</div>
+							) : null}
+
+							{page === 'preferences' ? (
+								<>
+									{/* Screen Header */}
+									<div className="text-left mb-8 border-b border-outline-variant pb-4">
+										<h1 className="font-headline-lg text-headline-lg text-on-surface font-semibold">Application Settings</h1>
+										<p className="font-body-md text-outline mt-1">Configure how 2Fast handles your secure tokens and app behavior.</p>
+									</div>
+
+									{/* Settings Group: Behavior */}
+									<section className="bg-surface-container border border-outline-variant p-space-lg rounded space-y-6">
+										<div className="flex items-center gap-3 mb-2">
+											<span className="material-symbols-outlined text-primary text-[18px]">dynamic_form</span>
+											<h2 className="font-label-md text-label-md text-primary uppercase tracking-widest">Automation &amp; Polling</h2>
+										</div>
+										<div className="space-y-4">
+											{/* Polling */}
+											<div className="flex items-center justify-between group">
+												<div className="flex flex-col text-left">
+													<span className="font-body-md text-body-md text-on-surface">Background Polling</span>
+													<span className="font-body-sm text-body-sm text-outline font-code-block">Refresh OTP data periodically</span>
+												</div>
+												<select
+													value={state.settings.pollIntervalMs}
+													onChange={(e) => void updateSettings({ pollIntervalMs: Number(e.target.value) })}
+													className="bg-surface-container-high rounded px-3 py-1.5 border border-outline-variant hover:bg-surface-bright cursor-pointer transition-colors text-body-sm text-on-surface font-code-block focus:outline-none"
+												>
+													{intervals.map((val) => (
+														<option key={val} value={val}>{val / 1000}s</option>
+													))}
+												</select>
+											</div>
+											{/* Auto-copy */}
+											<div className="flex items-center justify-between group">
+												<div className="flex flex-col text-left">
+													<span className="font-body-md text-body-md text-on-surface">Smart Auto-copy</span>
+													<span className="font-body-sm text-body-sm text-outline font-code-block">Automatically copy new OTP codes to clipboard</span>
+												</div>
+												<label className="custom-toggle">
+													<input
+														type="checkbox"
+														checked={state.settings.autoCopyToClipboard}
+														onChange={(e) => void updateSettings({ autoCopyToClipboard: e.target.checked })}
+													/>
+													<span className="slider"></span>
+												</label>
+											</div>
+											{/* Startup */}
+											<div className="flex items-center justify-between group">
+												<div className="flex flex-col text-left">
+													<span className="font-body-md text-body-md text-on-surface">Launch on Startup</span>
+													<span className="font-body-sm text-body-sm text-outline font-code-block">Open 2Fast when your computer starts</span>
+												</div>
+												<label className="custom-toggle">
+													<input
+														type="checkbox"
+														checked={state.settings.launchOnStartup}
+														onChange={(e) => void updateSettings({ launchOnStartup: e.target.checked })}
+													/>
+													<span className="slider"></span>
+												</label>
+											</div>
+										</div>
+									</section>
+
+									{/* Settings Group: Security */}
+									<section className="bg-surface-container border border-outline-variant p-space-lg rounded space-y-6">
+										<div className="flex items-center gap-3 mb-2">
+											<span className="material-symbols-outlined text-primary text-[18px]">security</span>
+											<h2 className="font-label-md text-label-md text-primary uppercase tracking-widest">Security &amp; Privacy</h2>
+										</div>
+										<div className="space-y-4">
+											{/* OTP TTL */}
+											<div className="flex items-center justify-between">
+												<div className="flex flex-col text-left">
+													<span className="font-body-md text-body-md text-on-surface">Token Time-to-Live (TTL)</span>
+													<span className="font-body-sm text-body-sm text-outline font-code-block">Clear sensitive data from memory after a set time</span>
+												</div>
+												<select
+													value={state.settings.otpTtlMinutes}
+													onChange={(e) => void updateSettings({ otpTtlMinutes: Number(e.target.value) })}
+													className="bg-surface-container-high rounded px-3 py-1.5 border border-outline-variant hover:bg-surface-bright cursor-pointer transition-colors text-body-sm text-on-surface font-code-block focus:outline-none"
+												>
+													{ttlValues.map((val) => (
+														<option key={val} value={val}>{val} min</option>
+													))}
+												</select>
+											</div>
+											{/* Notifications */}
+											<div className="flex items-center justify-between group">
+												<div className="flex flex-col text-left">
+													<span className="font-body-md text-body-md text-on-surface">Push Notifications</span>
+													<span className="font-body-sm text-body-sm text-outline font-code-block">Show system alerts when a login code is detected</span>
+												</div>
+												<label className="custom-toggle">
+													<input
+														type="checkbox"
+														checked={state.settings.showNotifications}
+														onChange={(e) => void updateSettings({ showNotifications: e.target.checked })}
+													/>
+													<span className="slider"></span>
+												</label>
+											</div>
+											{/* Sender allowlist */}
+											<div className="flex flex-col gap-2 text-left">
+												<span className="font-body-md text-body-md text-on-surface">Sender Allowlist</span>
+												<span className="font-body-sm text-body-sm text-outline font-code-block">Comma-separated emails to filter scanning (leave empty for all)</span>
+												<input
+													type="text"
+													value={(state.settings.filterSenders ?? []).join(', ')}
+													onChange={(e) => void updateSettings({ filterSenders: e.target.value.split(',').map((s) => s.trim()).filter((s) => s.length > 0) })}
+													className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
+													placeholder="e.g. secure@bank.com, support@github.com"
+												/>
+											</div>
+										</div>
+									</section>
+
+									{/* Settings Group: Feedback */}
+									<section className="bg-surface-container border border-outline-variant p-space-lg rounded space-y-6">
+										<div className="flex items-center gap-3 mb-2">
+											<span className="material-symbols-outlined text-primary text-[18px]">volume_up</span>
+											<h2 className="font-label-md text-label-md text-primary uppercase tracking-widest">Sound &amp; Feedback</h2>
+										</div>
+										<div className="space-y-4">
+											{/* Sound Alerts */}
+											<div className="flex items-center justify-between group">
+												<div className="flex flex-col text-left">
+													<span className="font-body-md text-body-md text-on-surface">Sound Alerts</span>
+													<span className="font-body-sm text-body-sm text-outline font-code-block">Play a subtle chime when an OTP is received</span>
+												</div>
+												<label className="custom-toggle">
+													<input
+														type="checkbox"
+														checked={state.settings.soundEnabled}
+														onChange={(e) => void updateSettings({ soundEnabled: e.target.checked })}
+													/>
+													<span className="slider"></span>
+												</label>
+											</div>
+										</div>
+									</section>
+
+									{/* Save / Actions Footer */}
+									<div className="pt-8 flex items-center justify-end gap-space-md">
+										<button
+											type="button"
+											className="px-6 py-2 rounded border border-outline-variant text-on-surface font-label-md uppercase tracking-wider hover:bg-surface-container-highest transition-all duration-200 cursor-pointer"
+											onClick={() => void updateSettings(DEFAULT_SETTINGS)}
+										>
+											Reset Defaults
+										</button>
+									</div>
+
+									{/* Footer Meta */}
+									<div className="flex justify-center pt-12 pb-8">
+										<p className="font-label-md text-label-md text-outline/60 font-code-block">2Fast Build v4.2.0-stable — Encrypted End-to-End</p>
+									</div>
+								</>
+							) : null}
+
+							{/* Feedback indicators */}
+							{status && <p className="text-green-400 font-semibold text-xs text-center mt-2">{status}</p>}
+							{error && <p role="alert" className="text-red-400 font-semibold text-xs text-center mt-2">{error}</p>}
+							{canCancelConnection && (
+								<button type="button" className="px-6 py-2 rounded border border-outline-variant text-on-surface hover:bg-surface-container-highest transition-all duration-200 mt-2 font-bold cursor-pointer" onClick={() => void cancelConnection()}>
+									Cancel Connection Flow
+								</button>
+							)}
+						</div>
+					</main>
+				</div>
 			</div>
 		</WindowChrome>
 	)
@@ -760,53 +1349,206 @@ function PollView(): ReactElement {
 		}
 	}
 
-	const title = target ? `${providerLabel(target.provider)} OTP` : 'OTP Check'
+	const title = target ? `${providerLabel(target.provider)}` : 'OTP Check'
 	const copiedCandidateLabel = (candidate: OtpResult): string => copiedCode === candidate.code ? 'Copied' : 'Copy code'
 
 	return (
-		<WindowChrome title={title} subtitle={target?.email}>
-			<div style={{ display: 'grid', gap: 9 }}>
-				{scanState === 'idle' ? <p style={{ margin: 0, color: '#cbd5e1' }}>Waiting for account selection.</p> : null}
-				{scanState === 'scanning' ? (
-					<div style={panelStyle}>
-						<p style={{ margin: 0, color: '#e0f2fe', fontWeight: 700 }}>Inspecting latest emails...</p>
-						<p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: 12 }}>Scanning the newest 5 received messages for code-like content.</p>
+		<WindowChrome title={title} subtitle={target?.email} view="poll">
+			<div className="flex flex-1 mt-8 h-[calc(520px-32px)] overflow-hidden">
+				{/* SideNavBar (Compact version for Tray OTP feed) */}
+				<nav className="h-full w-12 fixed left-0 top-8 bg-surface-container-low border-r border-surface-container-highest flex flex-col items-center py-4 gap-4 z-40 shrink-0 select-none">
+					<button
+						type="button"
+						disabled={scanState === 'scanning'}
+						title="Scan Feed"
+						className="w-8 h-8 flex items-center justify-center text-primary bg-surface-variant rounded transition-all duration-200 border border-outline/20 cursor-pointer disabled:opacity-50"
+						onClick={() => {
+							if (target) void runScan(target, { force: true })
+						}}
+					>
+						<span className="material-symbols-outlined text-[18px]">lock_open</span>
+					</button>
+					<button
+						type="button"
+						title="Open Settings"
+						className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-variant rounded transition-all duration-200 cursor-pointer"
+						onClick={() => {
+							const api = getApi()
+							if (api) void api['window:openSettings']()
+						}}
+					>
+						<span className="material-symbols-outlined text-[18px]">settings</span>
+					</button>
+				</nav>
+
+				{/* Main Content Area */}
+				<main className="ml-12 mt-8 flex-1 flex flex-col p-4 overflow-y-auto relative bg-background text-left">
+					{/* Header Section */}
+					<div className="mb-4 flex flex-col gap-1">
+						<div className="flex items-center gap-2 text-primary font-body-sm">
+							<span className="text-secondary">~/2Fast/feed</span>
+							<span className="text-on-surface-variant">$</span>
+							<span>./scan --service={target ? target.provider : 'mail'}</span>
+						</div>
 					</div>
-				) : null}
-				{scanState === 'complete' && candidates.length === 0 ? (
-					<div style={panelStyle}>
-						<p style={{ margin: 0, color: '#fde68a', fontWeight: 700 }}>No code-like emails found.</p>
-						<p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: 12 }}>The latest 5 messages did not match the OTP detector.</p>
-					</div>
-				) : null}
-				{scanState === 'error' ? <div style={panelStyle}><p style={{ margin: 0, color: '#fca5a5', fontWeight: 700 }}>{error ?? 'Something went wrong.'}</p></div> : null}
-				<div style={{ ...panelStyle, padding: 12 }}>
-					<p style={{ margin: '0 0 8px', color: '#cbd5e1', fontSize: 13, fontWeight: 700 }}>Latest 5 Scan</p>
-					{candidates.length === 0 ? <p style={{ margin: 0, color: '#94a3b8', fontSize: 12 }}>Code candidates will appear here after the scan.</p> : (
-						<div style={{ display: 'grid', gap: 8 }}>
-							{candidates.map((candidate) => (
-								<div key={`${candidate.source.messageId}-${candidate.code}`} style={{ display: 'grid', gridTemplateColumns: '1fr max-content', gap: 8, alignItems: 'start', padding: '9px 10px', borderRadius: 10, background: 'rgba(2, 6, 23, 0.42)', border: '1px solid rgba(148, 163, 184, 0.14)' }}>
-									<div style={{ minWidth: 0 }}>
-										<code style={{ display: 'block', color: '#f8fafc', fontSize: 22, fontWeight: 800, letterSpacing: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{candidate.code}</code>
-										<span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#cbd5e1', fontSize: 12 }}>{candidate.source.sender}</span>
-										<span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#94a3b8', fontSize: 11 }}>{formatTimestamp(candidate.source.receivedAt)} - {candidate.source.subject}</span>
+
+					{/* Scan states representation */}
+					<div className="space-y-3 shrink-0">
+						{scanState === 'scanning' && (
+							<div className="warp-block rounded p-4 mb-6 relative overflow-hidden">
+								<div className="flex items-start gap-3">
+									<div className="text-primary mt-0.5">
+										<span className="material-symbols-outlined text-[18px] animate-spin">sync</span>
 									</div>
-									<button type="button" title={copiedCandidateLabel(candidate)} aria-label={copiedCandidateLabel(candidate)} style={compactIconButtonStyle} onClick={() => void copyCandidate(candidate)}>
-										{copiedCode === candidate.code ? <CheckIcon /> : <CopyIcon />}
+									<div className="flex-1">
+										<p className="font-body-sm text-on-surface flex items-center gap-2">
+											Scanning Feed
+											<span className="w-1.5 h-3.5 bg-primary terminal-blink inline-block"></span>
+										</p>
+										<p className="font-body-sm text-outline mt-1 text-[11px]">Inspecting latest emails...</p>
+									</div>
+								</div>
+								{/* Progress Bar */}
+								<div className="mt-3 h-[2px] w-full bg-surface-container-highest overflow-hidden">
+									<div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: '45%' }}></div>
+								</div>
+							</div>
+						)}
+
+						{scanState === 'idle' && (
+							<div className="warp-block rounded p-4 mb-6 relative overflow-hidden">
+								<div className="flex items-start gap-3">
+									<div className="text-primary mt-0.5">
+										<span className="material-symbols-outlined text-[18px]">mail</span>
+									</div>
+									<div className="flex-1">
+										<p className="font-body-sm text-on-surface flex items-center gap-2">Ready to Scan</p>
+										<p className="font-body-sm text-outline mt-1 text-[11px]">Waiting for account query trigger...</p>
+									</div>
+								</div>
+								{/* Progress Bar */}
+								<div className="mt-3 h-[2px] w-full bg-surface-container-highest overflow-hidden">
+									<div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: '0%' }}></div>
+								</div>
+							</div>
+						)}
+
+						{scanState === 'complete' && candidates.length === 0 && (
+							<div className="warp-block rounded p-4 mb-6 relative overflow-hidden">
+								<div className="flex items-start gap-3">
+									<div className="text-primary mt-0.5">
+										<span className="material-symbols-outlined text-[18px]">warning</span>
+									</div>
+									<div className="flex-1">
+										<p className="font-body-sm text-on-surface flex items-center gap-2">No codes found</p>
+										<p className="font-body-sm text-outline mt-1 text-[11px]">No OTPs matched in the latest 5 emails</p>
+									</div>
+								</div>
+								{/* Progress Bar */}
+								<div className="mt-3 h-[2px] w-full bg-surface-container-highest overflow-hidden">
+									<div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: '100%' }}></div>
+								</div>
+							</div>
+						)}
+
+						{scanState === 'error' && (
+							<div className="flex flex-col gap-2">
+								<div className="warp-block rounded p-4 mb-6 relative overflow-hidden border-l-2 border-l-error">
+									<div className="flex items-start gap-3">
+										<div className="text-error mt-0.5">
+											<span className="material-symbols-outlined text-[18px]">error</span>
+										</div>
+										<div className="flex-1">
+											<p className="font-body-sm text-on-surface flex items-center gap-2">Scan failed</p>
+											<p className="font-body-sm text-red-300 mt-1 text-[11px] truncate max-w-[200px]">{error || 'Something went wrong'}</p>
+										</div>
+									</div>
+								</div>
+								{(error?.toLowerCase().includes('reconnect') || error?.toLowerCase().includes('expired')) && (
+									<button
+										type="button"
+										className="w-full py-2 bg-secondary-container text-secondary border border-secondary font-body-sm rounded hover:bg-surface-variant transition-colors cursor-pointer"
+										onClick={() => {
+											const api = getApi()
+											if (api) void api['window:openSettings']()
+										}}
+									>
+										Open Settings to Reconnect
+									</button>
+								)}
+							</div>
+						)}
+					</div>
+
+					{/* Candidates list */}
+					<div className="flex-1 flex flex-col gap-2 mt-4 min-h-0">
+						<div className="flex items-center justify-end mb-2 text-[11px] font-label-md select-none shrink-0">
+							<span className="text-secondary/80">LIVE</span>
+						</div>
+
+						<div className="space-y-1.5 overflow-y-auto pr-1 flex-1 min-h-0">
+							{candidates.map((candidate, idx) => (
+								<div
+									key={`${candidate.source.messageId}-${candidate.code}-${idx}`}
+									className={`rounded p-3 flex items-center justify-between transition-all group cursor-pointer ${
+										idx === 0 ? 'warp-block-active' : 'warp-block opacity-80 hover:opacity-100'
+									}`}
+								>
+									<div className="flex flex-col gap-1 min-w-0">
+										<span className={`font-code-otp text-code-otp leading-tight select-text ${idx === 0 ? 'text-primary' : 'text-on-surface-variant'}`}>{candidate.code}</span>
+										<span className="font-body-sm text-outline text-[11px] truncate max-w-[170px]">{candidate.source.sender}</span>
+										<span className="font-body-sm text-outline/60 text-[9px] truncate max-w-[170px]">{formatTimestamp(candidate.source.receivedAt)}</span>
+									</div>
+									<button
+										type="button"
+										title={copiedCandidateLabel(candidate)}
+										aria-label={copiedCandidateLabel(candidate)}
+										className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer p-1.5 rounded hover:bg-surface-container-highest shrink-0"
+										onClick={() => void copyCandidate(candidate)}
+									>
+										<span className="material-symbols-outlined text-[18px]">
+											{copiedCode === candidate.code ? 'check' : 'content_copy'}
+										</span>
 									</button>
 								</div>
 							))}
+							{candidates.length === 0 && (
+								<p className="font-body-sm text-outline text-center py-6 select-none bg-surface-container/10 border border-outline-variant/10 rounded">Candidates will appear here after scanning.</p>
+							)}
+						</div>
+					</div>
+
+					{/* Scan Trigger Button */}
+					{target && (
+						<div className="mt-4 shrink-0">
+							<button
+								type="button"
+								disabled={scanState === 'scanning'}
+								className="w-full h-10 bg-surface-container-high border border-outline/20 text-on-surface font-body-sm rounded flex items-center justify-center gap-2 hover:bg-surface-bright transition-all cursor-pointer disabled:opacity-50"
+								onClick={() => void runScan(target, { force: true })}
+							>
+								<span className="material-symbols-outlined text-[16px]">sync</span>
+								Scan Again
+							</button>
 						</div>
 					)}
-				</div>
-				<div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-					{target ? <button type="button" style={scanState === 'complete' ? primaryButtonStyle : buttonStyle} disabled={scanState === 'scanning'} onClick={() => void runScan(target, { force: true })}>Scan Again</button> : null}
-				</div>
+				</main>
 			</div>
 		</WindowChrome>
 	)
 }
 
+const initialSettingsState: SettingsState = {
+	accounts: [],
+	providers: [],
+	settings: DEFAULT_SETTINGS,
+	gmailConfigured: false,
+}
+
+/**
+ * Renders the main App component, switching views based on url query.
+ * @returns React element representing the active view (PollView or SettingsView).
+ */
 const App = (): ReactElement => viewFromLocation() === 'poll' ? <PollView /> : <SettingsView />
 
 export default App

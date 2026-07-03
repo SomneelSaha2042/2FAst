@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import type { Account, Label, MailFolder } from '../../shared/models'
+import { getProviderDescriptor } from '../../shared/provider-registry'
 
 interface SidebarProps {
   readonly account: Account | null
@@ -16,8 +17,8 @@ const Sidebar = ({
   activeFilterId,
   onSelectFilter,
 }: SidebarProps): ReactElement => {
-  const isGmail = account?.provider === 'gmail'
-  const items = isGmail
+  const usesLabels = account ? getProviderDescriptor(account.provider)?.mailboxStyle === 'labels' : false
+  const items = usesLabels
     ? labels.map((label) => ({
         id: label.id,
         name: label.name,
@@ -33,7 +34,7 @@ const Sidebar = ({
     <aside className="h-full border-r border-slate-200 bg-slate-50 p-4">
       <div className="mb-4">
         <p className="text-xs uppercase tracking-wide text-slate-500">
-          {account ? (isGmail ? 'Labels' : 'Folders') : 'All Inboxes'}
+          {account ? (usesLabels ? 'Labels' : 'Folders') : 'All Inboxes'}
         </p>
         <p className="text-sm font-semibold text-slate-900">
           {account?.displayName ?? 'Unified Inbox'}

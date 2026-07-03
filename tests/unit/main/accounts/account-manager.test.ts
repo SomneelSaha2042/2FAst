@@ -9,6 +9,11 @@ const userInfoGetMock = vi.fn()
 const runMicrosoftOAuthFlowMock = vi.fn()
 const acquireMicrosoftAccessTokenMock = vi.fn()
 const outlookProviderConstructorMock = vi.fn()
+const imapProviderConstructorMock = vi.fn()
+const validateImapConnectionMock = vi.fn()
+const saveImapCredentialsMock = vi.fn()
+const loadImapCredentialsMock = vi.fn()
+const deleteImapCredentialsMock = vi.fn()
 
 vi.mock('../../../../src/main/oauth/oauth-handler', () => ({
 	runOAuthFlow: runOAuthFlowMock,
@@ -30,6 +35,21 @@ vi.mock('../../../../src/main/oauth/microsoft-auth', () => ({
 vi.mock('../../../../src/main/accounts/token-store', () => ({
 	saveTokens: saveTokensMock,
 	deleteTokens: deleteTokensMock,
+}))
+
+vi.mock('../../../../src/main/accounts/imap-credential-store', () => ({
+	saveImapCredentials: saveImapCredentialsMock,
+	loadImapCredentials: loadImapCredentialsMock,
+	deleteImapCredentials: deleteImapCredentialsMock,
+}))
+
+vi.mock('../../../../src/main/providers/imap', () => ({
+	ImapProvider: class {
+		constructor(accountId: string, provider: string, credentials: unknown) {
+			imapProviderConstructorMock(accountId, provider, credentials)
+		}
+		validateConnection = validateImapConnectionMock
+	},
 }))
 
 vi.mock('../../../../src/main/providers/outlook', () => ({
@@ -101,6 +121,7 @@ describe('account manager', () => {
 			homeAccountId: 'ms-home-1',
 		})
 		acquireMicrosoftAccessTokenMock.mockResolvedValue('graph-access')
+		loadImapCredentialsMock.mockResolvedValue(null)
 		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
 			displayName: 'Outlook User',
 			mail: 'outlook@example.com',
@@ -205,5 +226,56 @@ describe('account manager', () => {
 		expect(reconnected.email).toBe('outlook@example.com')
 		expect(reconnected.oauthAccountId).toBe('ms-home-2')
 		expect(manager.listAccounts()).toHaveLength(1)
+	})
+
+	it('adds a branded IMAP account through the shared connector and encrypts credentials', async () => {
+		const { AccountManager } = await import('../../../../src/main/accounts/account-manager')
+		const manager = new AccountManager()
+		const added = await manager.addAccount({
+			authentication: 'app-password',
+			provider: 'zoho',
+			email: 'USER@zoho.com',
+			username: 'user@zoho.com',
+			password: 'app-password',
+		})
+		expect(added).toMatchObject({ provider: 'zoho', email: 'user@zoho.com' })
+		expect(imapProviderConstructorMock).toHaveBeenCalledWith(added.id, 'zoho', expect.objectContaining({
+			host: 'imap.zoho.com',
+			port: 993,
+			allowSelfSigned: false,
+		}))
+		expect(validateImapConnectionMock).toHaveBeenCalledOnce()
+		expect(saveImapCredentialsMock).toHaveBeenCalledWith(added.id, expect.objectContaining({ password: 'app-password' }))
+	})
+
+	it('rejects preset server overrides', async () => {
+		const { AccountManager } = await import('../../../../src/main/accounts/account-manager')
+		const manager = new AccountManager()
+		await expect(manager.addAccount({
+			authentication: 'app-password',
+			provider: 'zoho',
+			email: 'user@zoho.com',
+			username: 'user@zoho.com',
+			password: 'app-password',
+			host: 'evil.example.com',
+		})).rejects.toThrow('cannot override')
+	})
+
+	it('uses custom secure IMAP settings and deletes IMAP credentials on removal', async () => {
+		const { AccountManager } = await import('../../../../src/main/accounts/account-manager')
+		const manager = new AccountManager()
+		const added = await manager.addAccount({
+			authentication: 'app-password',
+			provider: 'imap',
+			email: 'user@example.com',
+			username: 'user@example.com',
+			password: 'app-password',
+			host: 'mail.example.com',
+			port: 143,
+			security: 'starttls',
+		})
+		await manager.removeAccount(added.id)
+		expect(saveImapCredentialsMock).toHaveBeenCalledWith(added.id, expect.objectContaining({ security: 'starttls' }))
+		expect(deleteImapCredentialsMock).toHaveBeenCalledWith(added.id)
 	})
 })

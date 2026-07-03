@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>2Fast - Settings Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "primary": "#c9c6c5",
+                "on-tertiary-container": "#0081b7",
+                "surface-variant": "#353535",
+                "on-tertiary-fixed": "#001e2f",
+                "surface-container-highest": "#353535",
+                "secondary-fixed-dim": "#d2bbff",
+                "on-secondary-fixed-variant": "#5a00c6",
+                "on-secondary-container": "#c9aeff",
+                "tertiary": "#89ceff",
+                "on-tertiary": "#00344d",
+                "surface-bright": "#393939",
+                "on-background": "#e5e2e1",
+                "on-primary": "#313030",
+                "on-error-container": "#ffdad6",
+                "surface-tint": "#c9c6c5",
+                "on-secondary": "#3f008e",
+                "error-container": "#93000a",
+                "outline": "#8e9192",
+                "on-primary-fixed": "#1c1b1b",
+                "tertiary-fixed-dim": "#89ceff",
+                "primary-fixed": "#e5e2e1",
+                "surface-container-lowest": "#0e0e0e",
+                "inverse-surface": "#e5e2e1",
+                "on-primary-fixed-variant": "#474646",
+                "background": "#131313",
+                "surface-dim": "#131313",
+                "surface-container-low": "#1c1b1b",
+                "on-primary-container": "#7a7978",
+                "surface": "#131313",
+                "error": "#ffb4ab",
+                "on-tertiary-fixed-variant": "#004c6e",
+                "on-surface": "#e5e2e1",
+                "on-error": "#690005",
+                "secondary-container": "#6001d1",
+                "primary-fixed-dim": "#c9c6c5",
+                "primary-container": "#090909",
+                "inverse-on-surface": "#313030",
+                "tertiary-fixed": "#c9e6ff",
+                "on-secondary-fixed": "#25005a",
+                "surface-container-high": "#2a2a2a",
+                "secondary-fixed": "#eaddff",
+                "tertiary-container": "#000a13",
+                "secondary": "#d2bbff",
+                "inverse-primary": "#5f5e5e",
+                "surface-container": "#20201f",
+                "outline-variant": "#444748",
+                "on-surface-variant": "#c4c7c7"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "space-md": "1rem",
+                "sidebar-width": "260px",
+                "space-xs": "0.25rem",
+                "gutter": "1px",
+                "space-lg": "1.5rem",
+                "edge-margin": "12px",
+                "space-sm": "0.5rem",
+                "card-padding": "1.25rem",
+                "stack-gap": "1rem",
+                "input-gap": "0.5rem",
+                "window-padding": "1.5rem",
+                "tray-width": "380px"
+        },
+        "fontFamily": {
+                "body-sm": [
+                        "JetBrains Mono"
+                ],
+                "label-md": [
+                        "JetBrains Mono"
+                ],
+                "headline-md": [
+                        "Hanken Grotesk"
+                ],
+                "code-block": [
+                        "JetBrains Mono"
+                ],
+                "body-md": [
+                        "JetBrains Mono"
+                ],
+                "body-lg": [
+                        "JetBrains Mono"
+                ],
+                "headline-lg": [
+                        "Hanken Grotesk"
+                ]
+        },
+        "fontSize": {
+                "body-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "18px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "label-md": [
+                        "11px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "headline-md": [
+                        "18px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "code-block": [
+                        "13px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-md": [
+                        "13px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-lg": [
+                        "14px",
+                        {
+                                "lineHeight": "22px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-lg": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-sm": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                "code-otp": ["20px", {"lineHeight": "24px", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                "title-bar": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                "body-base": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                "label-caps": ["11px", {"lineHeight": "16px", "fontWeight": "700"}]
+        }
+},
+    },
+  }
+</script>
+<style>
+        body {
+            background-color: #131313;
+            color: #e5e2e1;
+            margin: 0;
+            overflow-x: hidden;
+            width: 840px;
+            height: 720px;
+            font-family: "JetBrains Mono", monospace;
+        }
+        .terminal-block {
+            background: #1c1b1b;
+            border: 1px solid #444748;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+        .terminal-border-hover:hover {
+            border-color: #8e9192;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #131313;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #444748;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #8e9192;
+        }
+    </style>
+</head>
+<body class="flex flex-col select-none">
+<!-- TopAppBar (Custom Title Bar) -->
+<header class="fixed top-0 w-full h-8 flex items-center justify-between px-4 bg-surface-container-lowest border-b border-outline-variant z-50 font-body-sm">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm font-bold text-primary font-headline-md">2Fast</span>
+<span class="text-outline ml-4">Settings • Account Management</span>
+</div>
+<div class="flex gap-1">
+<button class="w-8 h-[24px] flex items-center justify-center rounded-[4px] hover:bg-surface-variant transition-colors text-outline">
+<span class="material-symbols-outlined text-[18px]">remove</span>
+</button>
+<button class="w-8 h-[24px] flex items-center justify-center rounded-[4px] hover:bg-error-container hover:text-on-error-container transition-colors text-outline">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+</header>
+<div class="flex flex-1 mt-8 h-[calc(720px-32px)]">
+<!-- SideNavBar -->
+<nav class="h-full w-20 flex flex-col items-center py-6 gap-stack-gap bg-surface-container-lowest border-r border-outline-variant shrink-0">
+<div class="flex flex-col items-center gap-1 mb-4">
+<span class="material-symbols-outlined text-primary text-[28px]">lock_open</span>
+<span class="font-label-md text-outline text-center uppercase tracking-widest">Secure</span>
+</div>
+<div class="flex flex-col gap-6 w-full px-2">
+<a class="flex flex-col items-center gap-1 py-3 text-outline hover:text-on-surface hover:bg-surface-variant rounded-lg transition-all duration-200" href="#">
+<span class="material-symbols-outlined">qr_code_2</span>
+<span class="font-label-md">Codes</span>
+</a>
+<a class="flex flex-col items-center gap-1 py-3 text-secondary bg-secondary-container rounded-lg transition-all duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md">Settings</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto p-window-padding bg-background relative">
+<div class="max-w-[640px] mx-auto flex flex-col gap-8">
+<!-- Account Management Header -->
+<section>
+<h1 class="font-headline-lg text-headline-lg text-on-surface mb-2 font-headline-md">Account Management</h1>
+<p class="font-body-md text-outline mb-6">Connect your email providers to automatically sync 2FA tokens and security alerts.</p>
+<div class="grid grid-cols-2 gap-4">
+<button class="flex items-center justify-center gap-3 bg-surface-container-high border border-outline-variant py-4 px-6 rounded-lg hover:bg-surface-container-highest transition-all terminal-border-hover group">
+<img alt="Google" class="w-6 h-6 grayscale group-hover:grayscale-0 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA_mgY5lwg47wJcDgloC_wdjdf9zPb3gTuacy8Q4EBoPQh1k4ttDu2MYJ1WolTFK6378lP-K9XPwhLXSJFgRv9o0hg_WWFLi6isBY00o2TNSK42_VvZsm8OOXiSfPXosTQvJIT-macRCniAjLrH8BradGq16BXavkUN6w5rRIr5qu2PTWsxTtPmFmvTyu5EwgUk175XhN_kqpv_aIpK8ubaUN5_PNsjOvQtvLTjPjyRWPrjUysroUiyYw"/>
+<span class="font-headline-sm text-headline-sm text-on-surface font-headline-md">Add Gmail</span>
+</button>
+<button class="flex items-center justify-center gap-3 bg-surface-container-high border border-outline-variant py-4 px-6 rounded-lg hover:bg-surface-container-highest transition-all terminal-border-hover group">
+<img alt="Outlook" class="w-6 h-6 grayscale group-hover:grayscale-0 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCspDzgpxtlCD2qBr1yZ7akhfSTZwyf8gvuCjKZRj_PsCktUC9OzLuwLQRK8M7PQqkyB0_jqEaxGz4GwK5L4yZe4dKxHTyq4-TfUVnQ4uH1ZMUizajMHm9VdUXpzOMC1LKTV8gTLYGiGlkesL9bWzx63Vj_oG4EZa5wgdeum7kFSJkb8fiqN1OCPhzuA7flUq3_EMkLji_k90zTCBPLiNM5SYhNZgf9APu8IuZDz2JgTkQZ2I-_080hw"/>
+<span class="font-headline-sm text-headline-sm text-on-surface font-headline-md">Add Outlook</span>
+</button>
+</div>
+</section>
+<!-- Connected Accounts List -->
+<section class="flex flex-col gap-4">
+<h2 class="font-label-md text-outline uppercase tracking-widest">Connected Services</h2>
+<!-- Card 1 -->
+<div class="terminal-block p-4 rounded-lg flex items-center justify-between border-l-2 border-l-secondary group transition-all">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-surface-container-highest flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-secondary">mail</span>
+</div>
+<div>
+<p class="font-body-md font-semibold text-on-surface">somneel.saha27@gmail.com</p>
+<p class="font-body-sm text-outline mt-1">Provider: Gmail • Connected 2 days ago</p>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="px-4 py-1.5 rounded bg-surface border border-outline-variant hover:bg-surface-variant transition-colors font-label-md text-on-surface">Reconnect</button>
+<button class="px-4 py-1.5 rounded bg-surface border border-outline-variant hover:border-error hover:bg-error-container text-error transition-colors font-label-md">Remove</button>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="terminal-block p-4 rounded-lg flex items-center justify-between border-l-2 border-l-outline group transition-all opacity-80 hover:opacity-100">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-surface-container-highest flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-outline">work</span>
+</div>
+<div>
+<p class="font-body-md font-semibold text-on-surface">saha.enterprise@outlook.com</p>
+<p class="font-body-sm text-outline mt-1">Provider: Outlook • Last sync failed</p>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="px-4 py-1.5 rounded bg-secondary-container border border-secondary text-secondary hover:bg-surface-variant transition-colors font-label-md">Reconnect</button>
+<button class="px-4 py-1.5 rounded bg-surface border border-outline-variant hover:border-error hover:bg-error-container text-error transition-colors font-label-md">Remove</button>
+</div>
+</div>
+</section>
+<!-- IMAP Form Section -->
+<section class="mt-4 pb-12">
+<div class="flex items-center gap-4 mb-6">
+<div class="h-px flex-1 bg-outline-variant"></div>
+<h2 class="font-label-md text-outline uppercase tracking-widest shrink-0">Add IMAP Account</h2>
+<div class="h-px flex-1 bg-outline-variant"></div>
+</div>
+<form class="grid grid-cols-2 gap-x-6 gap-y-4">
+<div class="flex flex-col gap-input-gap">
+<label class="font-label-md text-outline ml-1">PROVIDER NAME</label>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none transition-all placeholder:text-outline" placeholder="e.g. ProtonMail" type="text"/>
+</div>
+<div class="flex flex-col gap-input-gap">
+<label class="font-label-md text-outline ml-1">EMAIL ADDRESS</label>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none transition-all placeholder:text-outline" placeholder="user@provider.com" type="email"/>
+</div>
+<div class="flex flex-col gap-input-gap">
+<label class="font-label-md text-outline ml-1">IMAP USERNAME</label>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none transition-all placeholder:text-outline" placeholder="username_login" type="text"/>
+</div>
+<div class="flex flex-col gap-input-gap">
+<label class="font-label-md text-outline ml-1">APP PASSWORD</label>
+<div class="relative">
+<input class="w-full bg-surface-container-low border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none transition-all pr-12" type="password" value="••••••••••••"/>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-outline cursor-pointer hover:text-secondary">visibility</span>
+</div>
+</div>
+<div class="col-span-2 mt-4">
+<button class="w-full bg-secondary-container text-secondary font-headline-sm py-4 rounded hover:bg-surface-variant border border-secondary transition-all active:scale-[0.98] font-headline-md" type="submit">
+                                Verify and Connect Account
+                            </button>
+</div>
+</form>
+</section>
+</div>
+</main>
+</div>
+<!-- Notification Overlay (Micro-interaction mockup) -->
+<div class="fixed bottom-6 right-6 translate-y-20 opacity-0 transition-all duration-500 terminal-block border-l-2 border-l-secondary py-3 px-5 rounded flex items-center gap-3 z-[100]" id="toast">
+<span class="material-symbols-outlined text-secondary">check_circle</span>
+<p class="font-body-md text-on-surface">Connection successful</p>
+</div>
+<script>
+        // Simple micro-interaction for demonstration
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('mousedown', () => {
+                btn.classList.add('scale-95');
+            });
+            btn.addEventListener('mouseup', () => {
+                btn.classList.remove('scale-95');
+            });
+        });
+
+        // Mock toast notification on "Connect" button click
+        const connectBtn = document.querySelector('button[type="submit"]');
+        const toast = document.getElementById('toast');
+        
+        connectBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        });
+    </script>
+</body></html>

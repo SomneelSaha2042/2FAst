@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Account, Label, MailFolder } from '../../shared/models'
+import { getProviderDescriptor } from '../../shared/provider-registry'
 import type { AccountSelection } from './useAccounts'
 
 interface UseLabelsOptions {
@@ -27,7 +28,7 @@ export const useLabels = ({ activeAccountId, activeAccount }: UseLabelsOptions):
         return
       }
 
-      if (activeAccount.provider === 'gmail') {
+      if (getProviderDescriptor(activeAccount.provider)?.mailboxStyle === 'labels') {
         const result = await window.api['mail:listLabels'](activeAccount.id)
         if (result.success && result.data) {
           setLabels(result.data)

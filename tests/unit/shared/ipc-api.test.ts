@@ -8,6 +8,7 @@ describe('IPC channel list', () => {
 			'oauth:saveGoogleConfig',
 			'oauth:deleteGoogleConfig',
 			'oauth:cancelFlow',
+			'providers:list',
 			'accounts:list',
 			'accounts:add',
 			'accounts:reconnect',
@@ -34,6 +35,7 @@ describe('IPC channel list', () => {
 			'settings:update',
 			'window:hide',
 			'window:minimize',
+			'window:openSettings',
 		]
 
 		expect(IPC_CHANNELS).toEqual(expected)
