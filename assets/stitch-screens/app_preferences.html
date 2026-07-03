@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>2Fast - Preferences</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&amp;family=Hanken+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "primary": "#c9c6c5",
+                "on-tertiary-container": "#0081b7",
+                "surface-variant": "#353535",
+                "on-tertiary-fixed": "#001e2f",
+                "surface-container-highest": "#353535",
+                "secondary-fixed-dim": "#d2bbff",
+                "on-secondary-fixed-variant": "#5a00c6",
+                "on-secondary-container": "#c9aeff",
+                "tertiary": "#89ceff",
+                "on-tertiary": "#00344d",
+                "surface-bright": "#393939",
+                "on-background": "#e5e2e1",
+                "on-primary": "#313030",
+                "on-error-container": "#ffdad6",
+                "surface-tint": "#c9c6c5",
+                "on-secondary": "#3f008e",
+                "error-container": "#93000a",
+                "outline": "#8e9192",
+                "on-primary-fixed": "#1c1b1b",
+                "tertiary-fixed-dim": "#89ceff",
+                "primary-fixed": "#e5e2e1",
+                "surface-container-lowest": "#0e0e0e",
+                "inverse-surface": "#e5e2e1",
+                "on-primary-fixed-variant": "#474646",
+                "background": "#131313",
+                "surface-dim": "#131313",
+                "surface-container-low": "#1c1b1b",
+                "on-primary-container": "#7a7978",
+                "surface": "#131313",
+                "error": "#ffb4ab",
+                "on-tertiary-fixed-variant": "#004c6e",
+                "on-surface": "#e5e2e1",
+                "on-error": "#690005",
+                "secondary-container": "#6001d1",
+                "primary-fixed-dim": "#c9c6c5",
+                "primary-container": "#090909",
+                "inverse-on-surface": "#313030",
+                "tertiary-fixed": "#c9e6ff",
+                "on-secondary-fixed": "#25005a",
+                "surface-container-high": "#2a2a2a",
+                "secondary-fixed": "#eaddff",
+                "tertiary-container": "#000a13",
+                "secondary": "#d2bbff",
+                "inverse-primary": "#5f5e5e",
+                "surface-container": "#20201f",
+                "outline-variant": "#444748",
+                "on-surface-variant": "#c4c7c7"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "space-md": "1rem",
+                "sidebar-width": "260px",
+                "space-xs": "0.25rem",
+                "gutter": "1px",
+                "space-lg": "1.5rem",
+                "edge-margin": "12px",
+                "space-sm": "0.5rem"
+        },
+        "fontFamily": {
+                "body-sm": [
+                        "JetBrains Mono"
+                ],
+                "label-md": [
+                        "JetBrains Mono"
+                ],
+                "headline-md": [
+                        "Hanken Grotesk"
+                ],
+                "code-block": [
+                        "JetBrains Mono"
+                ],
+                "body-md": [
+                        "JetBrains Mono"
+                ],
+                "body-lg": [
+                        "JetBrains Mono"
+                ],
+                "headline-lg": [
+                        "Hanken Grotesk"
+                ]
+        },
+        "fontSize": {
+                "body-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "18px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "label-md": [
+                        "11px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "headline-md": [
+                        "18px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "code-block": [
+                        "13px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-md": [
+                        "13px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-lg": [
+                        "14px",
+                        {
+                                "lineHeight": "22px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-lg": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "600"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        body {
+            background-color: #131313;
+            color: #e5e2e1;
+            width: 840px;
+            height: 720px;
+            margin: 0;
+            overflow: hidden;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .custom-toggle {
+            position: relative;
+            display: inline-block;
+            width: 36px;
+            height: 20px;
+        }
+        .custom-toggle input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #2a2a2a;
+            transition: .2s;
+            border-radius: 0.125rem;
+            border: 1px solid #444748;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 12px;
+            width: 12px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #8e9192;
+            transition: .2s;
+            border-radius: 0.125rem;
+        }
+        input:checked + .slider { background-color: #c9c6c5; border-color: #c9c6c5; }
+        input:checked + .slider:before { transform: translateX(16px); background-color: #1c1b1b; }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="flex overflow-hidden">
+<!-- Sidebar Navigation -->
+<aside class="h-full w-16 fixed left-0 top-8 bg-surface-container-lowest border-r border-outline-variant flex flex-col items-center py-4 gap-space-md z-20">
+<div class="mb-4">
+<span class="material-symbols-outlined text-primary font-headline-md text-headline-md">lock_open</span>
+</div>
+<button class="w-10 h-10 flex items-center justify-center text-outline hover:text-on-surface-variant hover:bg-surface-variant transition-all duration-200 rounded">
+<span class="material-symbols-outlined">lock_open</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center text-primary bg-surface-container-high border border-outline-variant rounded transition-all duration-200">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</aside>
+<!-- Top App Bar (Title Bar) -->
+<header class="fixed top-0 w-full h-8 flex items-center justify-between px-4 bg-surface-container-lowest border-b border-outline-variant z-30 select-none cursor-default">
+<div class="flex items-center gap-2">
+<span class="font-headline-md text-headline-md font-bold text-primary">2Fast</span>
+<span class="font-label-md text-label-md text-outline uppercase tracking-wider">Preferences</span>
+</div>
+<div class="flex gap-1">
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-highest transition-colors text-outline">
+<span class="material-symbols-outlined text-[16px]">remove</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-error-container hover:text-error transition-colors text-outline">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-16 mt-8 p-space-lg w-full h-full overflow-y-auto bg-background relative">
+<div class="max-w-2xl mx-auto space-y-space-lg relative z-10">
+<div class="mb-8 border-b border-outline-variant pb-4">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Application Settings</h1>
+<p class="font-body-md text-body-md text-outline mt-1">Configure how 2Fast handles your secure tokens and app behavior.</p>
+</div>
+<!-- Settings Group: Behavior -->
+<section class="bg-surface-container border border-outline-variant p-space-lg rounded space-y-6">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-primary text-[18px]">dynamic_form</span>
+<h2 class="font-label-md text-label-md text-primary uppercase tracking-widest">Automation &amp; Polling</h2>
+</div>
+<div class="space-y-4">
+<!-- Polling -->
+<div class="flex items-center justify-between group">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface">Background Polling</span>
+<span class="font-body-sm text-body-sm text-outline font-code-block">Refresh OTP data every 10 seconds</span>
+</div>
+<label class="custom-toggle">
+<input checked="" type="checkbox"/>
+<span class="slider"></span>
+</label>
+</div>
+<!-- Auto-copy -->
+<div class="flex items-center justify-between group">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface">Smart Auto-copy</span>
+<span class="font-body-sm text-body-sm text-outline font-code-block">Automatically copy new OTP codes to clipboard</span>
+</div>
+<label class="custom-toggle">
+<input type="checkbox"/>
+<span class="slider"></span>
+</label>
+</div>
+<!-- Startup -->
+<div class="flex items-center justify-between group">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface">Launch on Startup</span>
+<span class="font-body-sm text-body-sm text-outline font-code-block">Open 2Fast when your computer starts</span>
+</div>
+<label class="custom-toggle">
+<input checked="" type="checkbox"/>
+<span class="slider"></span>
+</label>
+</div>
+</div>
+</section>
+<!-- Settings Group: Security -->
+<section class="bg-surface-container border border-outline-variant p-space-lg rounded space-y-6">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-primary text-[18px]">security</span>
+<h2 class="font-label-md text-label-md text-primary uppercase tracking-widest">Security &amp; Privacy</h2>
+</div>
+<div class="space-y-4">
+<!-- OTP TTL -->
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface">Token Time-to-Live (TTL)</span>
+<span class="font-body-sm text-body-sm text-outline font-code-block">Clear sensitive data from memory after 10 min</span>
+</div>
+<div class="flex items-center gap-2 bg-surface-container-high rounded px-3 py-1.5 border border-outline-variant hover:bg-surface-bright cursor-pointer transition-colors">
+<span class="font-body-sm text-body-sm text-on-surface font-code-block">10 min</span>
+<span class="material-symbols-outlined text-outline text-[16px]">expand_more</span>
+</div>
+</div>
+<!-- Notifications -->
+<div class="flex items-center justify-between group">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface">Push Notifications</span>
+<span class="font-body-sm text-body-sm text-outline font-code-block">Show system alerts for login attempts</span>
+</div>
+<label class="custom-toggle">
+<input checked="" type="checkbox"/>
+<span class="slider"></span>
+</label>
+</div>
+</div>
+</section>
+<!-- Settings Group: Feedback -->
+<section class="bg-surface-container border border-outline-variant p-space-lg rounded space-y-6">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-primary text-[18px]">volume_up</span>
+<h2 class="font-label-md text-label-md text-primary uppercase tracking-widest">Sound &amp; Feedback</h2>
+</div>
+<div class="space-y-4">
+<!-- Sound Alerts -->
+<div class="flex items-center justify-between group">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface">Sound Alerts</span>
+<span class="font-body-sm text-body-sm text-outline font-code-block">Play a subtle chime when an OTP is received</span>
+</div>
+<label class="custom-toggle">
+<input type="checkbox"/>
+<span class="slider"></span>
+</label>
+</div>
+</div>
+</section>
+<!-- Save / Actions Footer -->
+<div class="pt-8 flex items-center justify-end gap-space-md">
+<button class="px-6 py-2 rounded border border-outline-variant text-on-surface font-label-md uppercase tracking-wider hover:bg-surface-container-highest transition-all duration-200">
+                    Reset Defaults
+                </button>
+<button class="px-6 py-2 rounded bg-primary text-on-primary font-label-md uppercase tracking-wider hover:brightness-110 transition-all duration-200">
+                    Save Changes
+                </button>
+</div>
+<!-- Footer Meta -->
+<div class="flex justify-center pt-12 pb-8">
+<p class="font-label-md text-label-md text-outline/60 font-code-block">2Fast Build v4.2.0-stable — Encrypted End-to-End</p>
+</div>
+</div>
+</main>
+<script>
+        // Micro-interactions for toggles and UI feedback
+        document.querySelectorAll('input[type="checkbox"]').forEach(toggle => {
+            toggle.addEventListener('change', (e) => {
+                const parent = e.target.closest('.group');
+                if (e.target.checked) {
+                    parent.style.transition = 'all 0.3s ease';
+                }
+            });
+        });
+
+        // Simple mock window dragging logic placeholder
+        let isDragging = false;
+        const titleBar = document.querySelector('header');
+        titleBar.addEventListener('mousedown', () => isDragging = true);
+        window.addEventListener('mouseup', () => isDragging = false);
+    </script>
+</body></html>

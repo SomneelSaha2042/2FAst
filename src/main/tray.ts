@@ -142,6 +142,6 @@ export class TrayController {
 		if (process.platform === 'darwin' && file.includes('Template')) {
 			image.setTemplateImage(true)
 		}
-		return image.isEmpty() ? nativeImage.createEmpty() : image
+		return image.isEmpty() ? nativeImage.createEmpty() : image.resize({ width: 24, height: 24, quality: 'good' })
 	}
 }

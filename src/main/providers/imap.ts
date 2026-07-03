@@ -382,8 +382,22 @@ export class ImapProvider implements MailProvider {
 			this.client = null
 		}
 		const client = new ImapFlow(this.clientOptions())
-		client.on('error', (err) => {
-			console.error(`IMAP client error for account ${this.accountId}:`, err)
+		client.on('error', (err: unknown) => {
+			const error = err as { code?: string; message?: string }
+			const code = error?.code
+			const message = error?.message || ''
+			const isNormalDisconnect =
+				code === 'ETIMEOUT' ||
+				code === 'ECONNRESET' ||
+				code === 'EPIPE' ||
+				message.toLowerCase().includes('timeout') ||
+				message.toLowerCase().includes('reset')
+
+			if (isNormalDisconnect) {
+				console.warn(`IMAP connection closed for account ${this.accountId} (${code || 'timeout'}). Will reconnect on next activity.`)
+			} else {
+				console.error(`IMAP client error for account ${this.accountId}:`, err)
+			}
 			if (this.client === client) {
 				this.client.close()
 				this.client = null
