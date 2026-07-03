@@ -112,21 +112,21 @@ function WindowChrome(props: WindowChromeProps): ReactElement {
 	}
 
 	return (
-		<div className={`${isPollWindow ? 'w-[380px] h-[520px]' : 'w-[840px] h-[720px]'} bg-background text-on-surface flex flex-col relative overflow-hidden border border-outline-variant/15 rounded-xl shadow-2xl`}>
+		<div className={`${isPollWindow ? 'w-[380px] h-[520px]' : 'w-[840px] h-[720px]'} bg-background text-on-surface flex flex-col relative overflow-hidden border border-outline-variant rounded-xl shadow-2xl`}>
 			{/* TopAppBar (Custom Title Bar) */}
-			<header className="fixed top-0 w-full h-8 flex items-center justify-between px-4 bg-surface/80 backdrop-blur-xl border-b border-outline-variant/15 z-50 select-none" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+			<header className="fixed top-0 w-full h-8 flex items-center justify-between px-4 bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant z-50 select-none font-body-sm" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
 				<div className="flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-					<img src="/2FAst.png" alt="2Fast Logo" className="w-4 h-4 object-contain" />
-					<span className="font-bold text-primary tracking-wide text-sm">2Fast</span>
-					<span className="text-[10px] text-outline ml-3 uppercase tracking-widest font-semibold opacity-60">
-						{isPollWindow ? `${props.title} • ${props.subtitle || ''}` : `${props.title}`}
+					<img src="/2FAst.png" alt="2Fast Logo" className="w-5 h-5 object-contain" />
+					<span className="font-bold text-primary font-headline-md text-sm">2Fast</span>
+					<span className="text-outline text-[10px] uppercase tracking-widest ml-2 opacity-70">
+						{isPollWindow ? `~/2fast/feed` : `~/2fast/${props.view}`}
 					</span>
 				</div>
 				<div className="flex gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-					<button type="button" aria-label="Minimize" className="w-8 h-[24px] flex items-center justify-center rounded-[4px] hover:bg-surface-container-highest transition-colors text-outline cursor-pointer" onClick={handleMinimize}>
+					<button type="button" aria-label="Minimize" className="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-variant transition-colors text-outline cursor-pointer" onClick={handleMinimize}>
 						<span className="material-symbols-outlined text-[16px]">remove</span>
 					</button>
-					<button type="button" aria-label="Close" className="w-8 h-[24px] flex items-center justify-center rounded-[4px] hover:bg-error/20 hover:text-error transition-colors text-outline cursor-pointer" onClick={handleClose}>
+					<button type="button" aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded hover:bg-error-container hover:text-on-error-container transition-colors text-outline cursor-pointer" onClick={handleClose}>
 						<span className="material-symbols-outlined text-[16px]">close</span>
 					</button>
 				</div>
@@ -136,13 +136,6 @@ function WindowChrome(props: WindowChromeProps): ReactElement {
 			{props.children}
 		</div>
 	)
-}
-
-const initialSettingsState: SettingsState = {
-	accounts: [],
-	providers: [],
-	settings: DEFAULT_SETTINGS,
-	gmailConfigured: false,
 }
 
 function CopyLinkButton({ url, label, icon }: { readonly url: string; readonly label: string; readonly icon: string }): ReactElement {
@@ -159,7 +152,7 @@ function CopyLinkButton({ url, label, icon }: { readonly url: string; readonly l
 	return (
 		<button
 			type="button"
-			className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant/30 text-on-surface hover:bg-surface-container-highest transition-all text-xs font-semibold cursor-pointer"
+			className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-outline-variant/50 text-on-surface hover:bg-surface-variant transition-all text-body-sm font-medium cursor-pointer"
 			onClick={() => void handleCopy()}
 			title={url}
 		>
@@ -175,6 +168,8 @@ function CopyLinkButton({ url, label, icon }: { readonly url: string; readonly l
 /**
  * CodesDashboard Component: Handles Scanning and Displaying OTP Codes
  * inside the large main dashboard panel.
+ * @param props Component properties.
+ * @returns Dashboard element.
  */
 function CodesDashboard(props: { readonly accounts: readonly Account[] }): ReactElement {
 	const [selectedAccountId, setSelectedAccountId] = useState<string>(props.accounts[0]?.id || '')
@@ -195,6 +190,7 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 			return
 		}
 		setScanState('scanning')
+		setCandidates([])
 		setCopiedCode(null)
 		setError(null)
 		try {
@@ -232,15 +228,15 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 		<div className="grid grid-cols-[220px_1fr] gap-6 items-start">
 			{/* Accounts list selection */}
 			<div className="flex flex-col gap-2">
-				<span className="text-[10px] font-bold text-outline uppercase tracking-wider select-none mb-1 text-left">Select Account</span>
+				<span className="font-label-md text-outline uppercase tracking-wider select-none mb-1 text-left">Select Account</span>
 				{props.accounts.map((account) => (
 					<button
 						key={account.id}
 						type="button"
-						className={`p-3 rounded-lg flex flex-col items-start gap-1 transition-all text-left cursor-pointer border ${
+						className={`p-3 rounded flex flex-col items-start gap-1 transition-all text-left cursor-pointer border ${
 							selectedAccountId === account.id
-								? 'bg-primary/10 border-primary text-primary'
-								: 'bg-surface-container border-outline-variant/20 text-outline hover:text-on-surface-variant hover:bg-surface-variant/30'
+								? 'bg-secondary-container border-secondary text-secondary'
+								: 'bg-surface-container border-outline-variant text-outline hover:text-on-surface-variant hover:bg-surface-variant/30'
 						}`}
 						onClick={() => setSelectedAccountId(account.id)}
 					>
@@ -255,23 +251,24 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 				{selectedAccount && (
 					<>
 						{/* Active scan status */}
-						<div className="glass-panel rounded-xl p-4 relative overflow-hidden">
+						<div className="warp-block rounded p-4 relative overflow-hidden border border-outline-variant/30 bg-surface-container/40">
 							<div className="flex items-center justify-between">
 								<div className="flex items-center gap-3">
-									<div className={`relative w-10 h-10 flex items-center justify-center rounded-full bg-primary/10 text-primary ${scanState === 'scanning' ? 'animate-pulse' : ''}`}>
+									<div className={`relative w-10 h-10 flex items-center justify-center rounded bg-secondary-container text-secondary ${scanState === 'scanning' ? 'animate-pulse' : ''}`}>
 										<span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>mail</span>
 									</div>
 									<div className="text-left">
-										<p className="text-sm font-semibold text-on-surface">
+										<p className="font-body-sm text-on-surface flex items-center gap-2">
 											{scanState === 'scanning' ? 'Scanning Feed...' : scanState === 'error' ? 'Scan Failed' : 'Scan Feed Complete'}
+											{scanState === 'scanning' && <span className="w-1.5 h-3.5 bg-primary terminal-blink inline-block"></span>}
 										</p>
-										<p className="text-xs text-outline">{selectedAccount.email}</p>
+										<p className="font-body-sm text-outline text-[11px] mt-1">{selectedAccount.email}</p>
 									</div>
 								</div>
 								<button
 									type="button"
 									disabled={scanState === 'scanning'}
-									className="px-4 py-1.5 bg-primary-container hover:brightness-110 active:scale-[0.98] text-on-primary-container font-semibold rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 text-xs cursor-pointer"
+									className="px-4 py-1.5 bg-surface border border-outline-variant hover:bg-surface-variant transition-colors font-label-md text-on-surface cursor-pointer flex items-center gap-2"
 									onClick={() => void runScan(selectedAccount.id)}
 								>
 									<span className="material-symbols-outlined text-xs">sync</span>
@@ -279,46 +276,45 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 								</button>
 							</div>
 							{scanState === 'scanning' && (
-								<div className="mt-3.5 h-1 w-full bg-surface-container-highest rounded-full overflow-hidden">
-									<div className="h-full bg-primary-container animate-pulse" style={{ width: '70%' }}></div>
+								<div className="mt-3.5 h-[2px] w-full bg-surface-container-highest overflow-hidden">
+									<div className="h-full bg-primary animate-pulse" style={{ width: '70%' }}></div>
 								</div>
 							)}
 						</div>
 
 						{/* Error messaging */}
 						{scanState === 'error' && (
-							<div className="glass-panel rounded-xl p-4 border-l-2 border-l-error text-left">
-								<p className="text-sm font-semibold text-on-surface">Failed to retrieve codes</p>
-								<p className="text-xs text-red-300 mt-1">{error || 'Unknown error occurred'}</p>
+							<div className="terminal-block p-4 rounded-lg border-l-2 border-l-error text-left">
+								<p className="font-body-md font-semibold text-on-surface">Failed to retrieve codes</p>
+								<p className="font-body-sm text-red-300 mt-1">{error || 'Unknown error occurred'}</p>
 							</div>
 						)}
 
 						{/* Candidates codes list */}
 						<div className="space-y-2 text-left">
-							<div className="flex items-center justify-between mb-1 select-none">
-								<span className="text-[10px] font-bold text-outline uppercase tracking-wider">Latest 5 Scan</span>
-								<span className="text-[10px] font-bold text-primary/60 uppercase tracking-wider">Active Codes</span>
+							<div className="flex items-center justify-end mb-1 select-none">
+								<span className="font-label-md text-secondary/80 uppercase tracking-wider">LIVE</span>
 							</div>
 
 							<div className="space-y-2">
 								{candidates.map((candidate, idx) => (
 									<div
 										key={`${candidate.source.messageId}-${candidate.code}-${idx}`}
-										className={`glass-panel p-3 rounded-lg flex items-center justify-between transition-all group glow-hover ${
-											idx === 0 ? 'border-l-2 border-l-primary' : ''
+										className={`rounded p-3 flex items-center justify-between transition-all group cursor-pointer ${
+											idx === 0 ? 'warp-block-active' : 'warp-block opacity-80 hover:opacity-100'
 										}`}
 									>
-										<div className="flex flex-col min-w-0">
-											<span className="font-bold text-on-surface leading-tight text-lg tracking-wider font-code-otp select-text">{candidate.code}</span>
-											<span className="text-xs text-outline mt-0.5 truncate max-w-[320px]">{candidate.source.sender}</span>
-											<span className="text-[10px] text-outline/60 mt-0.5 truncate max-w-[320px]">
+										<div className="flex flex-col gap-1 min-w-0">
+											<span className={`font-code-otp text-code-otp leading-tight select-text ${idx === 0 ? 'text-primary' : 'text-on-surface-variant'}`}>{candidate.code}</span>
+											<span className="font-body-sm text-outline text-[11px] mt-0.5 truncate max-w-[320px]">{candidate.source.sender}</span>
+											<span className="font-body-sm text-outline/60 text-[10px] truncate max-w-[320px]">
 												{formatTimestamp(candidate.source.receivedAt)} - {candidate.source.subject}
 											</span>
 										</div>
 										<button
 											type="button"
 											title={copiedCode === candidate.code ? 'Copied' : 'Copy code'}
-											className="text-primary hover:text-white transition-colors cursor-pointer p-1.5 rounded hover:bg-surface-container-highest shrink-0"
+											className="text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-2 rounded hover:bg-surface-bright shrink-0"
 											onClick={() => void copyCandidate(candidate)}
 										>
 											<span className="material-symbols-outlined text-[18px]">
@@ -328,10 +324,10 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 									</div>
 								))}
 								{scanState === 'complete' && candidates.length === 0 && (
-									<p className="text-xs text-outline text-center py-6 bg-surface-container/30 rounded-lg">No OTP codes found in the latest emails.</p>
+									<p className="font-body-sm text-outline text-center py-6 bg-surface-container/30 rounded-lg">No OTP codes found in the latest emails.</p>
 								)}
 								{scanState === 'idle' && (
-									<p className="text-xs text-outline text-center py-6 bg-surface-container/30 rounded-lg">Scanning email inbox...</p>
+									<p className="font-body-sm text-outline text-center py-6 bg-surface-container/30 rounded-lg">Scanning email inbox...</p>
 								)}
 							</div>
 						</div>
@@ -381,7 +377,6 @@ function SettingsView(): ReactElement {
 	const imapDescriptors = useMemo(() =>
 		state.providers.filter((descriptor) => descriptor.transport === 'imap'),
 	[state.providers])
-
 
 	const getZohoHostForEmail = (emailStr: string): string => {
 		const domain = emailStr.trim().split('@')[1]?.toLowerCase() || ''
@@ -633,49 +628,46 @@ function SettingsView(): ReactElement {
 	return (
 		<WindowChrome title={pageTitle} view={page}>
 			<div className="flex flex-1 mt-8 h-[calc(720px-32px)] overflow-hidden">
-				{/* SideNavBar (Visible on Settings, Codes & Preferences views) */}
+				{/* SideNavBar */}
 				{page !== 'add-account' && (
-					<aside className="h-full w-20 flex flex-col items-center py-6 bg-surface/80 backdrop-blur-xl border-r border-outline-variant/15 shrink-0 z-20 select-none">
-						<div className="flex flex-col items-center gap-1 mb-6 opacity-80" title="2FAst Secure End-to-End">
-							<span className="material-symbols-outlined text-primary text-[28px]">lock_open</span>
-							<span className="text-[9px] text-outline text-center uppercase tracking-widest font-bold">Secure</span>
-						</div>
+					<aside className="h-full w-20 flex flex-col items-center py-6 bg-surface-container-lowest border-r border-outline-variant shrink-0 z-20 select-none">
+
 						<div className="flex flex-col gap-4 w-full px-2">
 							<button
 								type="button"
 								className={`flex flex-col items-center gap-1 py-3 transition-all duration-200 rounded-lg cursor-pointer ${
 									page === 'codes'
-										? 'text-primary bg-primary/10 font-semibold'
-										: 'text-outline hover:text-on-surface-variant hover:bg-surface-variant/30'
+										? 'text-secondary bg-secondary-container font-semibold'
+										: 'text-outline hover:text-on-surface hover:bg-surface-variant/30'
 								}`}
 								onClick={() => navigateToPage('codes')}
 							>
 								<span className="material-symbols-outlined text-[22px]">qr_code_2</span>
-								<span className="text-[10px] font-bold uppercase tracking-wider mt-1">Codes</span>
+								<span className="font-label-md text-[10px] mt-1">Codes</span>
 							</button>
 							<button
 								type="button"
 								className={`flex flex-col items-center gap-1 py-3 transition-all duration-200 rounded-lg cursor-pointer ${
 									page === 'settings'
-										? 'text-primary bg-primary/10 font-semibold'
-										: 'text-outline hover:text-on-surface-variant hover:bg-surface-variant/30'
+										? 'text-secondary bg-secondary-container font-semibold'
+										: 'text-outline hover:text-on-surface hover:bg-surface-variant/30'
 								}`}
 								onClick={() => navigateToPage('settings')}
 							>
 								<span className="material-symbols-outlined text-[22px]">settings</span>
-								<span className="text-[10px] font-bold uppercase tracking-wider mt-1">Accounts</span>
+								<span className="font-label-md text-[10px] mt-1">Accounts</span>
 							</button>
 							<button
 								type="button"
 								className={`flex flex-col items-center gap-1 py-3 transition-all duration-200 rounded-lg cursor-pointer ${
 									page === 'preferences'
-										? 'text-primary bg-primary/10'
-										: 'text-outline hover:text-on-surface-variant hover:bg-surface-variant/30'
+										? 'text-secondary bg-secondary-container font-semibold'
+										: 'text-outline hover:text-on-surface hover:bg-surface-variant/30'
 								}`}
 								onClick={() => navigateToPage('preferences')}
 							>
 								<span className="material-symbols-outlined text-[22px]">tune</span>
-								<span className="text-[10px] font-bold uppercase tracking-wider mt-1">Prefs</span>
+								<span className="font-label-md text-[10px] mt-1">Prefs</span>
 							</button>
 						</div>
 					</aside>
@@ -685,20 +677,20 @@ function SettingsView(): ReactElement {
 				<div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
 					{/* Secondary navigation for Wizard Views */}
 					{(page === 'add-account') && (
-						<div className="px-6 py-4 flex items-center justify-between border-b border-outline-variant/10 shrink-0 z-40 relative">
+						<div className="px-6 py-4 flex items-center justify-between border-b border-outline-variant/30 shrink-0 z-40 relative bg-surface">
 							<button
 								type="button"
-								className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-surface-variant/30 text-outline transition-all duration-200 group cursor-pointer"
+								className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-variant text-outline hover:text-on-surface transition-all duration-200 group font-label-md text-label-md cursor-pointer"
 								onClick={() => navigateToPage('settings')}
 							>
-								<span className="material-symbols-outlined text-[20px] group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
-								<span className="text-label-caps font-bold">Back to Accounts</span>
+								<span className="material-symbols-outlined text-[18px] group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
+								<span>cd ../accounts</span>
 							</button>
 							{selectedVendor === 'gmail' && (
 								<div className="flex items-center gap-2">
 									<CopyLinkButton url={GOOGLE_CONSOLE_URL} label="Console" icon="open_in_new" />
 									<CopyLinkButton url={GOOGLE_CREDENTIALS_URL} label="Credentials" icon="key" />
-									<CopyLinkButton url={BYOC_GUIDE_URL} label="OAuth Guide" icon="menu_book" />
+									<CopyLinkButton url={BYOC_GUIDE_URL} label="Docs" icon="menu_book" />
 								</div>
 							)}
 						</div>
@@ -706,42 +698,39 @@ function SettingsView(): ReactElement {
 
 					{/* Main Scrollable Canvas */}
 					<main className="flex-1 overflow-y-auto p-window-padding bg-background relative">
-						{/* Atmospheric Background Glow */}
-						<div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[120px] rounded-full -mr-32 -mt-32 pointer-events-none"></div>
-
 						<div className="max-w-2xl mx-auto flex flex-col gap-6 relative z-10">
 							{page === 'settings' ? (
 								<>
-									<div className="text-left flex items-start justify-between">
+									<div className="text-left flex items-start justify-between border-b border-outline-variant pb-4 mb-4">
 										<div>
-											<h1 className="text-headline-md text-on-surface mb-2 font-semibold">Account Management</h1>
-											<p className="text-body-base text-outline">Manage your connected email providers for OTP syncing.</p>
+											<h1 className="font-headline-lg text-headline-lg text-on-surface mb-2 font-semibold">Account Management</h1>
+											<p className="font-body-md text-outline">Connect your email providers to automatically sync 2FA tokens and security alerts.</p>
 										</div>
 										<button
 											type="button"
-											className="bg-primary hover:bg-primary-container text-on-primary font-bold px-6 py-3 rounded-xl transition-all transform active:scale-95 shadow-[0_0_20px_rgba(164,201,255,0.2)] flex items-center gap-2 cursor-pointer shrink-0"
+											className="bg-primary hover:bg-primary-fixed text-on-primary font-bold px-6 py-3 rounded transition-all transform active:scale-95 flex items-center gap-2 cursor-pointer shrink-0 text-sm font-body-md"
 											onClick={() => navigateToPage('add-account')}
 										>
-											<span className="material-symbols-outlined">add</span>
+											<span className="material-symbols-outlined text-sm">add</span>
 											Add Account
 										</button>
 									</div>
 
-									<section className="flex flex-col gap-3 text-left mt-4">
-										<h2 className="text-label-caps text-outline uppercase tracking-[0.15em] font-bold">Connected Services</h2>
+									<section className="flex flex-col gap-3 text-left">
+										<h2 className="font-label-md text-outline uppercase tracking-widest">Connected Services</h2>
 										{grouped.map((group) => (
 											<div key={group.descriptor.id} className="space-y-3">
 												{group.accounts.map((account) => (
-													<div key={account.id} className="glass-panel p-4 rounded-xl flex items-center justify-between border-l-4 border-l-primary group transition-all">
+													<div key={account.id} className="terminal-block p-4 rounded-lg flex items-center justify-between border-l-2 border-l-secondary group transition-all">
 														<div className="flex items-center gap-4">
-															<div className="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-primary">
-																<span className="material-symbols-outlined">
+															<div className="w-10 h-10 rounded bg-surface-container-highest flex items-center justify-center border border-outline-variant">
+																<span className="material-symbols-outlined text-secondary">
 																	{account.provider === 'gmail' ? 'mail' : account.provider === 'outlook' ? 'work' : 'dns'}
 																</span>
 															</div>
 															<div>
-																<p className="text-body-base font-semibold text-on-surface">{account.email}</p>
-																<p className="text-body-sm text-outline">
+																<p className="font-body-md font-semibold text-on-surface">{account.email}</p>
+																<p className="font-body-sm text-outline mt-1">
 																	Provider: {providerLabel(account.provider)}
 																	{account.oauthClientId ? ` • Client: ${shortClientId(account.oauthClientId)}` : ''}
 																</p>
@@ -750,14 +739,14 @@ function SettingsView(): ReactElement {
 														<div className="flex gap-2">
 															<button
 																type="button"
-																className="px-4 py-1.5 rounded-lg border border-outline-variant hover:bg-surface-variant/50 transition-colors text-label-caps text-on-surface font-bold cursor-pointer"
+																className="px-4 py-1.5 rounded bg-surface border border-outline-variant hover:bg-surface-variant transition-colors font-label-md text-on-surface cursor-pointer"
 																onClick={() => void reconnectAccount(account)}
 															>
 																Reconnect
 															</button>
 															<button
 																type="button"
-																className="px-4 py-1.5 rounded-lg border border-outline-variant hover:border-error/50 hover:bg-error/10 text-error transition-colors text-label-caps font-bold cursor-pointer"
+																className="px-4 py-1.5 rounded bg-surface border border-outline-variant hover:border-error hover:bg-error-container text-error transition-colors font-label-md cursor-pointer"
 																onClick={() => void removeAccount(account)}
 															>
 																Remove
@@ -768,18 +757,18 @@ function SettingsView(): ReactElement {
 											</div>
 										))}
 										{state.accounts.length === 0 && !state.gmailConfigured && (
-											<p className="text-body-base text-outline glass-panel p-4 rounded-xl">No accounts connected yet. Click Add Account to get started.</p>
+											<p className="font-body-base text-outline terminal-block p-4 rounded-lg">No accounts connected yet. Click Add Account to get started.</p>
 										)}
 										{state.gmailConfigured && state.gmailConfigEmail && !state.accounts.some(a => a.email.toLowerCase() === state.gmailConfigEmail!.toLowerCase() && a.provider === 'gmail') && (
-											<div className="glass-panel p-4 rounded-xl flex items-center justify-between border-l-4 border-l-outline-variant group transition-all mt-3">
+											<div className="terminal-block p-4 rounded-lg flex items-center justify-between border-l-2 border-l-secondary group transition-all mt-3">
 												<div className="flex items-center gap-4">
-													<div className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-outline">
+													<div className="w-10 h-10 rounded bg-surface-container-highest flex items-center justify-center border border-outline-variant text-outline">
 														<span className="material-symbols-outlined">mail</span>
 													</div>
 													<div>
-														<p className="text-body-base font-semibold text-on-surface">{state.gmailConfigEmail}</p>
-														<p className="text-body-sm text-outline">
-															Provider: Google Workspace / Gmail • <span className="text-primary font-semibold">Ready to Connect</span>
+														<p className="font-body-md font-semibold text-on-surface">{state.gmailConfigEmail}</p>
+														<p className="font-body-sm text-outline mt-1">
+															Provider: Google Workspace / Gmail • <span className="text-secondary font-semibold">Ready to Connect</span>
 														</p>
 													</div>
 												</div>
@@ -787,7 +776,7 @@ function SettingsView(): ReactElement {
 													<button
 														type="button"
 														disabled={isWorking}
-														className="px-6 py-1.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30 transition-colors text-label-caps font-bold cursor-pointer disabled:opacity-50"
+														className="px-6 py-1.5 rounded bg-secondary-container text-secondary hover:bg-surface-variant border border-secondary transition-all font-label-md cursor-pointer disabled:opacity-50"
 														onClick={addGmailAccount}
 													>
 														Connect
@@ -801,17 +790,17 @@ function SettingsView(): ReactElement {
 
 							{page === 'add-account' ? (
 								<>
-									<div className="text-left mb-6">
-										<h1 className="text-headline-md text-on-surface mb-2 font-semibold">Add New Account</h1>
-										<p className="text-body-base text-outline">Select a provider and follow the steps to connect your mailbox.</p>
+									<div className="text-left mb-6 border-b border-outline-variant pb-4">
+										<h1 className="font-headline-lg text-headline-lg text-primary mb-2">&gt; Add New Account</h1>
+										<p className="font-body-md text-outline">Select a provider and follow the steps to connect your mailbox.</p>
 									</div>
 
 									{/* Dropdown Card */}
-									<div className="glass-panel p-6 rounded-xl text-left border border-outline-variant/30 mb-6">
+									<div className="terminal-block p-6 rounded-lg text-left border border-outline-variant mb-6">
 										<div className="flex flex-col gap-input-gap">
-											<label className="text-label-caps text-outline ml-1">SELECT VENDOR</label>
+											<label className="font-label-md text-outline ml-1">SELECT VENDOR</label>
 											<select
-												className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all cursor-pointer font-semibold"
+												className="w-full bg-surface-container-low border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none transition-all cursor-pointer font-semibold"
 												value={selectedVendor}
 												onChange={(e) => handleVendorChange(e.target.value as Provider)}
 											>
@@ -826,17 +815,17 @@ function SettingsView(): ReactElement {
 									{/* Conditional views */}
 									{selectedVendor === 'gmail' && (
 										<div className="space-y-6 text-left">
-											<div className="glass-panel p-5 rounded-xl border border-blue-500/20 bg-blue-950/10 mb-5 leading-relaxed text-sm">
-												<h4 className="font-bold text-on-surface mb-2 flex items-center gap-1.5">
+											<div className="terminal-block p-5 rounded-lg border border-outline-variant mb-5 leading-relaxed text-sm bg-surface-container/20">
+												<h4 className="font-bold text-on-surface mb-2 flex items-center gap-1.5 font-headline-md">
 													<span className="material-symbols-outlined text-[18px] text-primary">info</span>
 													Gmail BYOC Setup Guide
 												</h4>
-												<p className="text-outline">
+												<p className="font-body-sm text-outline">
 													Follow these steps to generate your own Google Cloud client credentials. This keeps your data private and ensures you have dedicated API rate limits.
 												</p>
 											</div>
 
-											<div className="space-y-5 pb-6">
+											<div className="space-y-5 pb-6 border-b border-outline-variant/30">
 												{[
 													{ step: 1, title: 'Log In', text: 'Log in with the Google account you want to link in 2Fast.' },
 													{ step: 2, title: 'Open Google Console', text: 'Open the Google Cloud Console for that account.' },
@@ -850,57 +839,68 @@ function SettingsView(): ReactElement {
 													{ step: 10, title: 'Copy and Save', text: 'Copy the client ID and client secret into the fields below, then save credentials.' }
 												].map((item) => (
 													<div key={item.step} className="flex gap-4">
-														<div className="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-xs shrink-0 select-none shadow-[0_0_10px_rgba(164,201,255,0.3)]">
+														<div className="w-8 h-8 rounded bg-primary text-on-primary flex items-center justify-center font-bold text-body-md shrink-0 select-none shadow-[0_0_10px_rgba(201,198,197,0.3)]">
 															{item.step}
 														</div>
 														<div className="flex-1">
-															<h4 className="text-body-base font-semibold text-on-surface mb-0.5">{item.title}</h4>
-															<p className="text-body-sm text-outline leading-relaxed">{item.text}</p>
+															<h4 className="font-headline-md text-headline-md text-on-surface mb-0.5">{item.title}</h4>
+															<p className="font-body-sm text-outline leading-relaxed">{item.text}</p>
 														</div>
 													</div>
 												))}
 											</div>
 
+											{/* Setup Card Illustration / Placeholder */}
+											<div className="w-full h-48 rounded bg-surface-container border border-outline-variant flex items-center justify-center relative overflow-hidden mb-6">
+												<div className="absolute inset-0 opacity-20">
+													<div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuDd-mVRm1Z56VKeOR300R1o8f_CYDGwpKZD0btv4XW_sUJyIZVlMuyKk9FZHsWmVzfHSGBBlimUG0cWqjLNdjyGwEzY6cMGwkxojku1SMufGYVZkKZ9dwwRKeRbNiX1c23zV1OGdkfWEKst8aF6DYADZPvxgsMhFSO6TPG4DutT2zhf4ZrpJWxB9tDHfM1FfyaTFzd8cPLshpQqVPNKCRcg-J_g_u0WbjaUOdMYadYdM13DTdz8lHffpg')` }}></div>
+												</div>
+												<div className="relative z-10 flex flex-col items-center">
+													<span className="material-symbols-outlined text-primary text-[48px] mb-2" style={{ fontVariationSettings: "'FILL' 1" }}>terminal</span>
+													<span className="font-label-md text-label-md text-on-surface tracking-[0.2em] uppercase">Awaiting Input</span>
+												</div>
+											</div>
+
 											{/* Gmail BYOC config inputs */}
-											<div className="glass-panel p-6 rounded-xl border border-outline-variant/30 space-y-4">
-												<h3 className="text-headline-sm font-semibold text-on-surface mb-2">Gmail API Credentials</h3>
+											<div className="terminal-block p-6 rounded-lg border border-outline-variant space-y-4">
+												<h3 className="font-headline-md text-headline-md font-semibold text-on-surface mb-2">&gt; Gmail API Credentials</h3>
 												<div className="grid grid-cols-2 gap-4">
 													<div className="flex flex-col gap-input-gap">
-														<label className="text-label-caps text-outline ml-1">GMAIL EMAIL</label>
+														<label className="font-label-md text-outline ml-1">GMAIL EMAIL</label>
 														<input
 															type="email"
-															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
 															placeholder="user@gmail.com"
 															value={gmailEmail}
 															onChange={(e) => setGmailEmail(e.target.value)}
 														/>
 													</div>
 													<div className="flex flex-col gap-input-gap">
-														<label className="text-label-caps text-outline ml-1">PROJECT ID (OPTIONAL)</label>
+														<label className="font-label-md text-outline ml-1">PROJECT ID (OPTIONAL)</label>
 														<input
 															type="text"
-															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
 															placeholder="e.g. personal-project-123"
 															value={projectId}
 															onChange={(e) => setProjectId(e.target.value)}
 														/>
 													</div>
-													<div className="flex flex-col gap-input-gap">
-														<label className="text-label-caps text-outline ml-1">CLIENT ID</label>
+													<div className="flex flex-col gap-input-gap col-span-2">
+														<label className="font-label-md text-outline ml-1">CLIENT ID</label>
 														<input
 															type="text"
-															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all font-mono text-sm"
-															placeholder="Paste Client ID"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
+															placeholder="000000000000-xxxxx.apps.googleusercontent.com"
 															value={clientId}
 															onChange={(e) => setClientId(e.target.value)}
 														/>
 													</div>
-													<div className="flex flex-col gap-input-gap">
-														<label className="text-label-caps text-outline ml-1">CLIENT SECRET</label>
+													<div className="flex flex-col gap-input-gap col-span-2">
+														<label className="font-label-md text-outline ml-1">CLIENT SECRET</label>
 														<input
 															type="password"
-															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
-															placeholder="Paste Client Secret"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
+															placeholder="••••••••••••••••••••"
 															value={clientSecret}
 															onChange={(e) => setClientSecret(e.target.value)}
 														/>
@@ -915,10 +915,11 @@ function SettingsView(): ReactElement {
 													<button
 														type="button"
 														disabled={isWorking || !gmailEmail.trim() || !clientId.trim() || !clientSecret.trim()}
-														className="ml-auto bg-gradient-to-r from-primary-container to-blue-600 text-on-primary-container font-bold py-3.5 px-8 rounded-xl shadow-[0_0_20px_rgba(96,165,250,0.2)] hover:shadow-[0_0_30px_rgba(96,165,250,0.4)] hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-sm"
+														className="ml-auto bg-primary hover:bg-primary-fixed text-on-primary font-bold px-8 py-2.5 rounded transition-all transform active:scale-95 flex items-center gap-2 font-body-md cursor-pointer disabled:opacity-50 text-sm"
 														onClick={saveByocConfig}
 													>
-														{gmailSaveState === 'saving' ? 'Saving...' : 'Save Google Credentials'}
+														{gmailSaveState === 'saving' ? 'Saving...' : '> Authorize'}
+														<span className="material-symbols-outlined text-[18px]">keyboard_return</span>
 													</button>
 												</div>
 											</div>
@@ -926,19 +927,19 @@ function SettingsView(): ReactElement {
 									)}
 
 									{selectedVendor === 'outlook' && (
-										<div className="glass-panel p-6 rounded-xl text-left border border-outline-variant/30 flex flex-col gap-4">
+										<div className="terminal-block p-6 rounded-lg text-left border border-outline-variant flex flex-col gap-4">
 											<div className="flex items-center gap-3">
 												<span className="material-symbols-outlined text-primary text-[28px]">work</span>
-												<h3 className="text-headline-sm font-semibold text-on-surface">Microsoft Outlook</h3>
+												<h3 className="font-headline-md text-headline-md font-semibold text-on-surface">Microsoft Outlook</h3>
 											</div>
-											<p className="text-body-base text-outline leading-relaxed">
+											<p className="font-body-md text-outline leading-relaxed">
 												Connect your Outlook, Hotmail, or Microsoft 365 account with one click using Microsoft OAuth.
 											</p>
 											<div className="pt-2">
 												<button
 													type="button"
 													disabled={isWorking}
-													className="w-full bg-primary hover:bg-primary-container text-on-primary font-bold py-3.5 rounded-xl transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 text-sm shadow-[0_0_15px_rgba(164,201,255,0.15)]"
+													className="w-full bg-secondary-container text-secondary border border-secondary font-headline-sm py-4 rounded hover:bg-surface-variant transition-all active:scale-[0.98] font-headline-md cursor-pointer flex items-center justify-center gap-2"
 													onClick={() => void addAccount({ authentication: 'oauth', provider: 'outlook' })}
 												>
 													<span className="material-symbols-outlined text-[20px]">login</span> Connect Outlook Account
@@ -951,22 +952,22 @@ function SettingsView(): ReactElement {
 										<div className="space-y-4">
 											{/* Zoho custom instructions */}
 											{selectedVendor === 'zoho' && (
-												<div className="glass-panel p-5 rounded-xl border border-blue-500/20 bg-blue-950/10 leading-relaxed text-sm text-left">
-													<h4 className="font-bold text-on-surface mb-2 flex items-center gap-1.5">
+												<div className="terminal-block p-5 rounded-lg border border-outline-variant leading-relaxed text-sm text-left">
+													<h4 className="font-bold text-on-surface mb-2 flex items-center gap-1.5 font-headline-md">
 														<span className="material-symbols-outlined text-[18px] text-primary">info</span>
 														Zoho Mail Setup Instructions (Custom IMAP)
 													</h4>
-													<ol className="list-decimal list-inside space-y-2 text-outline">
+													<ol className="list-decimal list-inside space-y-2 text-outline font-body-sm">
 														<li>
 															<strong>Enable IMAP Access</strong>: Sign in to Zoho Mail web interface → Open <strong>Settings</strong> → Go to <strong>Mail Accounts</strong> → Select your primary email address → Scroll to the <strong>IMAP</strong> section → Check <strong>IMAP Access</strong> → Click <strong>Save</strong>.
 														</li>
 														<li>
-															<strong>Generate App Password</strong>: Go to your Zoho Accounts dashboard (accounts.zoho.com) → Select <strong>Security</strong> → <strong>App passwords</strong> → Click <strong>Generate New Password</strong> → Enter the name <code className="bg-surface-container-highest px-1.5 py-0.5 rounded text-on-surface font-semibold text-xs">2FAST</code> and click <strong>Generate</strong>.
+															<strong>Generate App Password</strong>: Go to your Zoho Accounts dashboard (accounts.zoho.com) → Select <strong>Security</strong> → <strong>App passwords</strong> → Click <strong>Generate New Password</strong> → Enter the name <code className="bg-surface-container-highest px-1.5 py-0.5 rounded text-on-surface font-semibold text-xs border border-outline-variant/30">2FAST</code> and click <strong>Generate</strong>.
 														</li>
 														<li>
 															<strong>Enter Credentials</strong>:
 															<ul className="list-disc list-inside ml-5 mt-1 space-y-1">
-																<li><strong>Email Address</strong>: Enter your full Zoho email (e.g., <code className="text-on-surface">user@zoho.com</code>).</li>
+																<li><strong>Email Address</strong>: Enter your full Zoho email (e.g., <code className="text-on-surface font-mono">user@zoho.com</code>).</li>
 																<li><strong>IMAP Username</strong>: Must be your <strong className="text-on-surface">full email address</strong> (do not enter the app name "2FAST").</li>
 																<li><strong>App Password</strong>: Copy and paste the 16-character generated code <strong className="text-on-surface">without any spaces</strong>.</li>
 															</ul>
@@ -975,29 +976,27 @@ function SettingsView(): ReactElement {
 												</div>
 											)}
 
-
-
 											{/* Generic IMAP instructions */}
 											{selectedVendor === 'imap' && (
-												<div className="glass-panel p-5 rounded-xl border border-outline-variant/30 leading-relaxed text-sm text-left">
-													<h4 className="font-bold text-on-surface mb-1.5 flex items-center gap-1.5">
+												<div className="terminal-block p-5 rounded-lg border border-outline-variant leading-relaxed text-sm text-left">
+													<h4 className="font-bold text-on-surface mb-1.5 flex items-center gap-1.5 font-headline-md">
 														<span className="material-symbols-outlined text-[18px] text-primary">info</span>
 														Custom IMAP Setup
 													</h4>
-													<p className="text-outline">
+													<p className="font-body-sm text-outline">
 														Enter the secure incoming IMAP server credentials provided by your email host (Yahoo, iCloud, Fastmail, Proton Mail Bridge, or any private mail server).
 													</p>
 												</div>
 											)}
 
 											{/* IMAP Input Fields Card */}
-											<div className="glass-panel p-6 rounded-xl border border-outline-variant/30 text-left">
+											<div className="terminal-block p-6 rounded-lg border border-outline-variant text-left">
 												<div className="grid grid-cols-2 gap-x-6 gap-y-4">
 													<div className="flex flex-col gap-input-gap">
-														<label className="text-label-caps text-outline ml-1">EMAIL ADDRESS</label>
+														<label className="font-label-md text-outline ml-1">EMAIL ADDRESS</label>
 														<input
 															type="email"
-															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all placeholder:text-outline/40"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
 															placeholder="user@provider.com"
 															value={imapEmail}
 															onChange={(e) => {
@@ -1007,21 +1006,21 @@ function SettingsView(): ReactElement {
 														/>
 													</div>
 													<div className="flex flex-col gap-input-gap">
-														<label className="text-label-caps text-outline ml-1">IMAP USERNAME</label>
+														<label className="font-label-md text-outline ml-1">IMAP USERNAME</label>
 														<input
 															type="text"
-															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all placeholder:text-outline/40"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
 															placeholder="full email address or login name"
 															value={imapUsername}
 															onChange={(e) => setImapUsername(e.target.value)}
 														/>
 													</div>
 													<div className="flex flex-col gap-input-gap col-span-2">
-														<label className="text-label-caps text-outline ml-1">APP PASSWORD</label>
+														<label className="font-label-md text-outline ml-1">APP PASSWORD</label>
 														<input
 															type="password"
 															autoComplete="new-password"
-															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all placeholder:text-outline/40"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200 placeholder:text-outline/40"
 															placeholder="••••••••••••"
 															value={imapPassword}
 															onChange={(e) => setImapPassword(e.target.value)}
@@ -1029,29 +1028,29 @@ function SettingsView(): ReactElement {
 													</div>
 
 													<div className="flex flex-col gap-input-gap">
-														<label className="text-label-caps text-outline ml-1">IMAP HOST</label>
+														<label className="font-label-md text-outline ml-1">IMAP HOST</label>
 														<input
 															type="text"
-															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
 															value={imapHost}
 															onChange={handleHostChange}
 														/>
 													</div>
 													<div className="flex flex-col gap-input-gap">
-														<label className="text-label-caps text-outline ml-1">PORT</label>
+														<label className="font-label-md text-outline ml-1">PORT</label>
 														<input
 															type="number"
 															min="1"
 															max="65535"
-															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+															className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
 															value={imapPort}
 															onChange={(e) => setImapPort(e.target.value)}
 														/>
 													</div>
 													<div className="flex flex-col gap-input-gap col-span-2">
-														<label className="text-label-caps text-outline ml-1">ENCRYPTION</label>
+														<label className="font-label-md text-outline ml-1">ENCRYPTION</label>
 														<select
-															className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-3 text-on-surface text-body-base focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all cursor-pointer"
+															className="w-full bg-surface-container-low border border-outline-variant rounded p-3 text-on-surface font-body-md focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none transition-all cursor-pointer"
 															value={imapSecurity}
 															onChange={(e) => setImapSecurity(e.target.value as ImapSecurity)}
 														>
@@ -1064,7 +1063,7 @@ function SettingsView(): ReactElement {
 														<button
 															type="button"
 															disabled={isWorking || !imapEmail.trim() || !imapUsername.trim() || !imapPassword || !imapHost.trim()}
-															className="w-full bg-gradient-to-r from-primary-container to-blue-600 text-on-primary-container font-bold py-3.5 rounded-xl shadow-[0_0_20px_rgba(96,165,250,0.2)] hover:shadow-[0_0_30px_rgba(96,165,250,0.4)] hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-sm"
+															className="w-full bg-secondary-container text-secondary border border-secondary font-headline-sm py-4 rounded hover:bg-surface-variant transition-all active:scale-[0.98] font-headline-md cursor-pointer disabled:opacity-50 text-sm"
 															onClick={addImapAccount}
 														>
 															Verify and Connect Account
@@ -1080,15 +1079,15 @@ function SettingsView(): ReactElement {
 							{page === 'codes' ? (
 								<div className="text-left">
 									{state.accounts.length === 0 ? (
-										<div className="glass-panel p-6 rounded-xl text-center">
-											<h1 className="text-headline-md text-on-surface mb-2 font-semibold">Security Codes Feed</h1>
-											<p className="text-body-base text-outline">No accounts connected yet. Please connect an account first under the Accounts tab.</p>
+										<div className="terminal-block p-6 rounded-lg text-center border border-outline-variant">
+											<h1 className="font-headline-lg text-headline-lg text-on-surface mb-2 font-semibold">Security Codes Feed</h1>
+											<p className="font-body-base text-outline">No accounts connected yet. Please connect an account first under the Accounts tab.</p>
 										</div>
 									) : (
 										<>
-											<div className="mb-6">
-												<h1 className="text-headline-md text-on-surface mb-2 font-semibold">Security Codes Feed</h1>
-												<p className="text-body-base text-outline">Select a connected account to scan and retrieve the latest OTP codes.</p>
+											<div className="mb-6 border-b border-outline-variant pb-4">
+												<h1 className="font-headline-lg text-headline-lg text-on-surface mb-2 font-semibold">Security Codes Feed</h1>
+												<p className="font-body-md text-outline">Select a connected account to scan and retrieve the latest OTP codes.</p>
 											</div>
 											<CodesDashboard accounts={state.accounts} />
 										</>
@@ -1096,33 +1095,31 @@ function SettingsView(): ReactElement {
 								</div>
 							) : null}
 
-
-
 							{page === 'preferences' ? (
 								<>
 									{/* Screen Header */}
-									<div className="text-left">
-										<h1 className="text-headline-md text-on-surface font-semibold">Application Settings</h1>
-										<p className="text-body-base text-outline">Configure how 2Fast handles your secure tokens and app behavior.</p>
+									<div className="text-left mb-8 border-b border-outline-variant pb-4">
+										<h1 className="font-headline-lg text-headline-lg text-on-surface font-semibold">Application Settings</h1>
+										<p className="font-body-md text-outline mt-1">Configure how 2Fast handles your secure tokens and app behavior.</p>
 									</div>
 
 									{/* Settings Group: Behavior */}
-									<section className="glass-panel p-card-padding rounded-xl space-y-6 neon-glow transition-all duration-300">
+									<section className="bg-surface-container border border-outline-variant p-space-lg rounded space-y-6">
 										<div className="flex items-center gap-3 mb-2">
-											<span className="material-symbols-outlined text-primary">dynamic_form</span>
-											<h2 className="text-label-caps text-primary uppercase tracking-widest font-bold">Automation & Polling</h2>
+											<span className="material-symbols-outlined text-primary text-[18px]">dynamic_form</span>
+											<h2 className="font-label-md text-label-md text-primary uppercase tracking-widest">Automation &amp; Polling</h2>
 										</div>
 										<div className="space-y-4">
 											{/* Polling */}
-											<div className="flex items-center justify-between">
+											<div className="flex items-center justify-between group">
 												<div className="flex flex-col text-left">
-													<span className="text-body-base text-on-surface">Background Polling</span>
-													<span className="text-body-sm text-outline">Refresh OTP data periodically</span>
+													<span className="font-body-md text-body-md text-on-surface">Background Polling</span>
+													<span className="font-body-sm text-body-sm text-outline font-code-block">Refresh OTP data periodically</span>
 												</div>
 												<select
 													value={state.settings.pollIntervalMs}
 													onChange={(e) => void updateSettings({ pollIntervalMs: Number(e.target.value) })}
-													className="bg-surface-container rounded-lg px-3 py-1.5 border border-outline-variant/30 text-body-sm text-on-surface focus:outline-none cursor-pointer"
+													className="bg-surface-container-high rounded px-3 py-1.5 border border-outline-variant hover:bg-surface-bright cursor-pointer transition-colors text-body-sm text-on-surface font-code-block focus:outline-none"
 												>
 													{intervals.map((val) => (
 														<option key={val} value={val}>{val / 1000}s</option>
@@ -1132,8 +1129,8 @@ function SettingsView(): ReactElement {
 											{/* Auto-copy */}
 											<div className="flex items-center justify-between group">
 												<div className="flex flex-col text-left">
-													<span className="text-body-base text-on-surface">Smart Auto-copy</span>
-													<span className="text-body-sm text-outline">Automatically copy new OTP codes to clipboard</span>
+													<span className="font-body-md text-body-md text-on-surface">Smart Auto-copy</span>
+													<span className="font-body-sm text-body-sm text-outline font-code-block">Automatically copy new OTP codes to clipboard</span>
 												</div>
 												<label className="custom-toggle">
 													<input
@@ -1147,8 +1144,8 @@ function SettingsView(): ReactElement {
 											{/* Startup */}
 											<div className="flex items-center justify-between group">
 												<div className="flex flex-col text-left">
-													<span className="text-body-base text-on-surface">Launch on Startup</span>
-													<span className="text-body-sm text-outline">Open 2Fast when your computer starts</span>
+													<span className="font-body-md text-body-md text-on-surface">Launch on Startup</span>
+													<span className="font-body-sm text-body-sm text-outline font-code-block">Open 2Fast when your computer starts</span>
 												</div>
 												<label className="custom-toggle">
 													<input
@@ -1163,22 +1160,22 @@ function SettingsView(): ReactElement {
 									</section>
 
 									{/* Settings Group: Security */}
-									<section className="glass-panel p-card-padding rounded-xl space-y-6 neon-glow transition-all duration-300">
+									<section className="bg-surface-container border border-outline-variant p-space-lg rounded space-y-6">
 										<div className="flex items-center gap-3 mb-2">
-											<span className="material-symbols-outlined text-primary">security</span>
-											<h2 className="text-label-caps text-primary uppercase tracking-widest font-bold">Security & Privacy</h2>
+											<span className="material-symbols-outlined text-primary text-[18px]">security</span>
+											<h2 className="font-label-md text-label-md text-primary uppercase tracking-widest">Security &amp; Privacy</h2>
 										</div>
 										<div className="space-y-4">
 											{/* OTP TTL */}
 											<div className="flex items-center justify-between">
 												<div className="flex flex-col text-left">
-													<span className="text-body-base text-on-surface">Token Time-to-Live (TTL)</span>
-													<span className="text-body-sm text-outline">Clear sensitive data from memory after a set time</span>
+													<span className="font-body-md text-body-md text-on-surface">Token Time-to-Live (TTL)</span>
+													<span className="font-body-sm text-body-sm text-outline font-code-block">Clear sensitive data from memory after a set time</span>
 												</div>
 												<select
 													value={state.settings.otpTtlMinutes}
 													onChange={(e) => void updateSettings({ otpTtlMinutes: Number(e.target.value) })}
-													className="bg-surface-container rounded-lg px-3 py-1.5 border border-outline-variant/30 text-body-sm text-on-surface focus:outline-none cursor-pointer"
+													className="bg-surface-container-high rounded px-3 py-1.5 border border-outline-variant hover:bg-surface-bright cursor-pointer transition-colors text-body-sm text-on-surface font-code-block focus:outline-none"
 												>
 													{ttlValues.map((val) => (
 														<option key={val} value={val}>{val} min</option>
@@ -1188,8 +1185,8 @@ function SettingsView(): ReactElement {
 											{/* Notifications */}
 											<div className="flex items-center justify-between group">
 												<div className="flex flex-col text-left">
-													<span className="text-body-base text-on-surface">Push Notifications</span>
-													<span className="text-body-sm text-outline">Show system alerts when a login code is detected</span>
+													<span className="font-body-md text-body-md text-on-surface">Push Notifications</span>
+													<span className="font-body-sm text-body-sm text-outline font-code-block">Show system alerts when a login code is detected</span>
 												</div>
 												<label className="custom-toggle">
 													<input
@@ -1202,13 +1199,13 @@ function SettingsView(): ReactElement {
 											</div>
 											{/* Sender allowlist */}
 											<div className="flex flex-col gap-2 text-left">
-												<span className="text-body-base text-on-surface">Sender Allowlist</span>
-												<span className="text-body-sm text-outline">Comma-separated emails to filter scanning (leave empty for all)</span>
+												<span className="font-body-md text-body-md text-on-surface">Sender Allowlist</span>
+												<span className="font-body-sm text-body-sm text-outline font-code-block">Comma-separated emails to filter scanning (leave empty for all)</span>
 												<input
 													type="text"
 													value={(state.settings.filterSenders ?? []).join(', ')}
 													onChange={(e) => void updateSettings({ filterSenders: e.target.value.split(',').map((s) => s.trim()).filter((s) => s.length > 0) })}
-													className="w-full bg-[#0F172A] border border-outline-variant rounded-lg p-2.5 text-on-surface text-xs focus:border-primary focus:outline-none"
+													className="w-full bg-surface border border-outline-variant rounded px-4 py-2 font-code-block text-code-block text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
 													placeholder="e.g. secure@bank.com, support@github.com"
 												/>
 											</div>
@@ -1216,17 +1213,17 @@ function SettingsView(): ReactElement {
 									</section>
 
 									{/* Settings Group: Feedback */}
-									<section className="glass-panel p-card-padding rounded-xl space-y-6 neon-glow transition-all duration-300">
+									<section className="bg-surface-container border border-outline-variant p-space-lg rounded space-y-6">
 										<div className="flex items-center gap-3 mb-2">
-											<span className="material-symbols-outlined text-primary">volume_up</span>
-											<h2 className="text-label-caps text-primary uppercase tracking-widest font-bold">Sound & Feedback</h2>
+											<span className="material-symbols-outlined text-primary text-[18px]">volume_up</span>
+											<h2 className="font-label-md text-label-md text-primary uppercase tracking-widest">Sound &amp; Feedback</h2>
 										</div>
 										<div className="space-y-4">
 											{/* Sound Alerts */}
 											<div className="flex items-center justify-between group">
 												<div className="flex flex-col text-left">
-													<span className="text-body-base text-on-surface">Sound Alerts</span>
-													<span className="text-body-sm text-outline">Play a subtle chime when an OTP is received</span>
+													<span className="font-body-md text-body-md text-on-surface">Sound Alerts</span>
+													<span className="font-body-sm text-body-sm text-outline font-code-block">Play a subtle chime when an OTP is received</span>
 												</div>
 												<label className="custom-toggle">
 													<input
@@ -1240,9 +1237,20 @@ function SettingsView(): ReactElement {
 										</div>
 									</section>
 
+									{/* Save / Actions Footer */}
+									<div className="pt-8 flex items-center justify-end gap-space-md">
+										<button
+											type="button"
+											className="px-6 py-2 rounded border border-outline-variant text-on-surface font-label-md uppercase tracking-wider hover:bg-surface-container-highest transition-all duration-200 cursor-pointer"
+											onClick={() => void updateSettings(DEFAULT_SETTINGS)}
+										>
+											Reset Defaults
+										</button>
+									</div>
+
 									{/* Footer Meta */}
-									<div className="flex justify-center pt-6 pb-4">
-										<p className="text-label-caps text-outline/40 font-bold">2Fast Build v4.2.0 — Encrypted End-to-End</p>
+									<div className="flex justify-center pt-12 pb-8">
+										<p className="font-label-md text-label-md text-outline/60 font-code-block">2Fast Build v4.2.0-stable — Encrypted End-to-End</p>
 									</div>
 								</>
 							) : null}
@@ -1251,7 +1259,7 @@ function SettingsView(): ReactElement {
 							{status && <p className="text-green-400 font-semibold text-xs text-center mt-2">{status}</p>}
 							{error && <p role="alert" className="text-red-400 font-semibold text-xs text-center mt-2">{error}</p>}
 							{canCancelConnection && (
-								<button type="button" className="px-6 py-2 rounded-lg border border-outline-variant text-on-surface hover:bg-surface-container-highest transition-all duration-200 mt-2 font-bold cursor-pointer" onClick={() => void cancelConnection()}>
+								<button type="button" className="px-6 py-2 rounded border border-outline-variant text-on-surface hover:bg-surface-container-highest transition-all duration-200 mt-2 font-bold cursor-pointer" onClick={() => void cancelConnection()}>
 									Cancel Connection Flow
 								</button>
 							)}
@@ -1348,99 +1356,118 @@ function PollView(): ReactElement {
 		<WindowChrome title={title} subtitle={target?.email} view="poll">
 			<div className="flex flex-1 mt-8 h-[calc(520px-32px)] overflow-hidden">
 				{/* SideNavBar (Compact version for Tray OTP feed) */}
-				<nav className="h-full w-16 bg-surface/80 backdrop-blur-xl border-r border-outline-variant/15 flex flex-col items-center py-4 gap-4 z-40 shrink-0 select-none animate-fade-in">
+				<nav className="h-full w-12 fixed left-0 top-8 bg-surface-container-low border-r border-surface-container-highest flex flex-col items-center py-4 gap-4 z-40 shrink-0 select-none">
 					<button
 						type="button"
 						disabled={scanState === 'scanning'}
 						title="Scan Feed"
-						className="w-10 h-10 flex items-center justify-center text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-all duration-200 cursor-pointer disabled:opacity-50"
+						className="w-8 h-8 flex items-center justify-center text-primary bg-surface-variant rounded transition-all duration-200 border border-outline/20 cursor-pointer disabled:opacity-50"
 						onClick={() => {
 							if (target) void runScan(target, { force: true })
 						}}
 					>
-						<span className="material-symbols-outlined">lock_open</span>
+						<span className="material-symbols-outlined text-[18px]">lock_open</span>
 					</button>
 					<button
 						type="button"
 						title="Open Settings"
-						className="w-10 h-10 flex items-center justify-center text-outline hover:text-on-surface-variant hover:bg-surface-variant/30 rounded-lg transition-all duration-200 cursor-pointer"
+						className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-variant rounded transition-all duration-200 cursor-pointer"
 						onClick={() => {
 							const api = getApi()
 							if (api) void api['window:openSettings']()
 						}}
 					>
-						<span className="material-symbols-outlined">settings</span>
+						<span className="material-symbols-outlined text-[18px]">settings</span>
 					</button>
 				</nav>
 
 				{/* Main Content Area */}
-				<main className="flex-1 flex flex-col p-window-padding overflow-y-auto relative text-left">
+				<main className="ml-12 mt-8 flex-1 flex flex-col p-4 overflow-y-auto relative bg-background text-left">
 					{/* Header Section */}
-					<div className="mb-4">
-						<h1 className="text-headline-sm text-primary mb-0.5 font-bold">{target ? providerLabel(target.provider) : 'Mail'} OTP</h1>
-						<p className="text-[10px] font-bold text-outline uppercase tracking-wider">{target?.email || 'Authentication Feed'}</p>
+					<div className="mb-4 flex flex-col gap-1">
+						<div className="flex items-center gap-2 text-primary font-body-sm">
+							<span className="text-secondary">~/2Fast/feed</span>
+							<span className="text-on-surface-variant">$</span>
+							<span>./scan --service={target ? target.provider : 'mail'}</span>
+						</div>
 					</div>
 
 					{/* Scan states representation */}
 					<div className="space-y-3 shrink-0">
 						{scanState === 'scanning' && (
-							<div className="glass-panel rounded-xl p-4 relative overflow-hidden">
-								<div className="flex items-center gap-3">
-									<div className="relative w-10 h-10 flex items-center justify-center rounded-full bg-primary/10 text-primary">
-										<span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>mail</span>
-										<div className="absolute inset-0 rounded-full border border-primary/40 animate-ping"></div>
+							<div className="warp-block rounded p-4 mb-6 relative overflow-hidden">
+								<div className="flex items-start gap-3">
+									<div className="text-primary mt-0.5">
+										<span className="material-symbols-outlined text-[18px] animate-spin">sync</span>
 									</div>
-									<div>
-										<p className="text-sm font-semibold text-on-surface">Scanning Feed...</p>
-										<p className="text-xs text-outline">Inspecting latest emails</p>
+									<div className="flex-1">
+										<p className="font-body-sm text-on-surface flex items-center gap-2">
+											Scanning Feed
+											<span className="w-1.5 h-3.5 bg-primary terminal-blink inline-block"></span>
+										</p>
+										<p className="font-body-sm text-outline mt-1 text-[11px]">Inspecting latest emails...</p>
 									</div>
 								</div>
-								{/* Pulse scan line */}
-								<div className="mt-3.5 h-1 w-full bg-surface-container-highest rounded-full overflow-hidden">
-									<div className="h-full bg-primary-container animate-pulse" style={{ width: '60%' }}></div>
+								{/* Progress Bar */}
+								<div className="mt-3 h-[2px] w-full bg-surface-container-highest overflow-hidden">
+									<div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: '45%' }}></div>
 								</div>
 							</div>
 						)}
 
 						{scanState === 'idle' && (
-							<div className="glass-panel rounded-xl p-4 flex items-center gap-3 border-l-2 border-l-primary">
-								<div className="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-highest text-outline">
-									<span className="material-symbols-outlined">mail</span>
+							<div className="warp-block rounded p-4 mb-6 relative overflow-hidden">
+								<div className="flex items-start gap-3">
+									<div className="text-primary mt-0.5">
+										<span className="material-symbols-outlined text-[18px]">mail</span>
+									</div>
+									<div className="flex-1">
+										<p className="font-body-sm text-on-surface flex items-center gap-2">Ready to Scan</p>
+										<p className="font-body-sm text-outline mt-1 text-[11px]">Waiting for account query trigger...</p>
+									</div>
 								</div>
-								<div>
-									<p className="text-sm font-semibold text-on-surface">Ready to Scan</p>
-									<p className="text-xs text-outline">Waiting for account query trigger...</p>
+								{/* Progress Bar */}
+								<div className="mt-3 h-[2px] w-full bg-surface-container-highest overflow-hidden">
+									<div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: '0%' }}></div>
 								</div>
 							</div>
 						)}
 
 						{scanState === 'complete' && candidates.length === 0 && (
-							<div className="glass-panel rounded-xl p-4 flex items-center gap-3 border-l-2 border-l-tertiary">
-								<div className="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-highest text-tertiary">
-									<span className="material-symbols-outlined">warning</span>
+							<div className="warp-block rounded p-4 mb-6 relative overflow-hidden">
+								<div className="flex items-start gap-3">
+									<div className="text-primary mt-0.5">
+										<span className="material-symbols-outlined text-[18px]">warning</span>
+									</div>
+									<div className="flex-1">
+										<p className="font-body-sm text-on-surface flex items-center gap-2">No codes found</p>
+										<p className="font-body-sm text-outline mt-1 text-[11px]">No OTPs matched in the latest 5 emails</p>
+									</div>
 								</div>
-								<div>
-									<p className="text-sm font-semibold text-on-surface">No codes found</p>
-									<p className="text-xs text-outline">No OTPs matched in the latest 5 emails</p>
+								{/* Progress Bar */}
+								<div className="mt-3 h-[2px] w-full bg-surface-container-highest overflow-hidden">
+									<div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: '100%' }}></div>
 								</div>
 							</div>
 						)}
 
 						{scanState === 'error' && (
 							<div className="flex flex-col gap-2">
-								<div className="glass-panel rounded-xl p-4 flex items-center gap-3 border-l-2 border-l-error">
-									<div className="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-highest text-error">
-										<span className="material-symbols-outlined">error</span>
-									</div>
-									<div>
-										<p className="text-sm font-semibold text-on-surface">Scan failed</p>
-										<p className="text-xs text-red-300 truncate max-w-[200px]">{error || 'Something went wrong'}</p>
+								<div className="warp-block rounded p-4 mb-6 relative overflow-hidden border-l-2 border-l-error">
+									<div className="flex items-start gap-3">
+										<div className="text-error mt-0.5">
+											<span className="material-symbols-outlined text-[18px]">error</span>
+										</div>
+										<div className="flex-1">
+											<p className="font-body-sm text-on-surface flex items-center gap-2">Scan failed</p>
+											<p className="font-body-sm text-red-300 mt-1 text-[11px] truncate max-w-[200px]">{error || 'Something went wrong'}</p>
+										</div>
 									</div>
 								</div>
 								{(error?.toLowerCase().includes('reconnect') || error?.toLowerCase().includes('expired')) && (
 									<button
 										type="button"
-										className="w-full py-2 bg-primary/20 hover:bg-primary/30 border border-primary/30 text-primary font-bold text-xs rounded-lg transition-colors cursor-pointer"
+										className="w-full py-2 bg-secondary-container text-secondary border border-secondary font-body-sm rounded hover:bg-surface-variant transition-colors cursor-pointer"
 										onClick={() => {
 											const api = getApi()
 											if (api) void api['window:openSettings']()
@@ -1455,29 +1482,28 @@ function PollView(): ReactElement {
 
 					{/* Candidates list */}
 					<div className="flex-1 flex flex-col gap-2 mt-4 min-h-0">
-						<div className="flex items-center justify-between mb-1 select-none shrink-0">
-							<span className="text-[10px] font-bold text-outline uppercase tracking-wider">Latest 5 Scan</span>
-							<span className="text-[10px] font-bold text-primary/60 uppercase tracking-wider">Live Updates</span>
+						<div className="flex items-center justify-end mb-2 text-[11px] font-label-md select-none shrink-0">
+							<span className="text-secondary/80">LIVE</span>
 						</div>
 
-						<div className="space-y-2 overflow-y-auto pr-1 flex-1 min-h-0">
+						<div className="space-y-1.5 overflow-y-auto pr-1 flex-1 min-h-0">
 							{candidates.map((candidate, idx) => (
 								<div
 									key={`${candidate.source.messageId}-${candidate.code}-${idx}`}
-									className={`glass-panel p-3 rounded-lg flex items-center justify-between transition-all group glow-hover ${
-										idx === 0 ? 'border-l-2 border-l-primary' : ''
+									className={`rounded p-3 flex items-center justify-between transition-all group cursor-pointer ${
+										idx === 0 ? 'warp-block-active' : 'warp-block opacity-80 hover:opacity-100'
 									}`}
 								>
-									<div className="flex flex-col min-w-0">
-										<span className="font-bold text-on-surface leading-tight text-lg tracking-wider font-code-otp select-text">{candidate.code}</span>
-										<span className="text-xs text-outline mt-0.5 truncate max-w-[170px]">{candidate.source.sender}</span>
-										<span className="text-[10px] text-outline/60 mt-0.5 truncate max-w-[170px]">{formatTimestamp(candidate.source.receivedAt)} - {candidate.source.subject}</span>
+									<div className="flex flex-col gap-1 min-w-0">
+										<span className={`font-code-otp text-code-otp leading-tight select-text ${idx === 0 ? 'text-primary' : 'text-on-surface-variant'}`}>{candidate.code}</span>
+										<span className="font-body-sm text-outline text-[11px] truncate max-w-[170px]">{candidate.source.sender}</span>
+										<span className="font-body-sm text-outline/60 text-[9px] truncate max-w-[170px]">{formatTimestamp(candidate.source.receivedAt)}</span>
 									</div>
 									<button
 										type="button"
 										title={copiedCandidateLabel(candidate)}
 										aria-label={copiedCandidateLabel(candidate)}
-										className="text-primary hover:text-white transition-colors cursor-pointer p-1.5 rounded hover:bg-surface-container-highest shrink-0"
+										className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer p-1.5 rounded hover:bg-surface-container-highest shrink-0"
 										onClick={() => void copyCandidate(candidate)}
 									>
 										<span className="material-symbols-outlined text-[18px]">
@@ -1487,7 +1513,7 @@ function PollView(): ReactElement {
 								</div>
 							))}
 							{candidates.length === 0 && (
-								<p className="text-xs text-outline text-center py-6 select-none">Candidates will appear here after scanning.</p>
+								<p className="font-body-sm text-outline text-center py-6 select-none bg-surface-container/10 border border-outline-variant/10 rounded">Candidates will appear here after scanning.</p>
 							)}
 						</div>
 					</div>
@@ -1498,10 +1524,10 @@ function PollView(): ReactElement {
 							<button
 								type="button"
 								disabled={scanState === 'scanning'}
-								className="w-full h-11 bg-primary-container hover:brightness-110 active:scale-[0.98] text-on-primary-container font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/10 disabled:opacity-50 cursor-pointer text-sm"
+								className="w-full h-10 bg-surface-container-high border border-outline/20 text-on-surface font-body-sm rounded flex items-center justify-center gap-2 hover:bg-surface-bright transition-all cursor-pointer disabled:opacity-50"
 								onClick={() => void runScan(target, { force: true })}
 							>
-								<span className="material-symbols-outlined text-sm">sync</span>
+								<span className="material-symbols-outlined text-[16px]">sync</span>
 								Scan Again
 							</button>
 						</div>
@@ -1512,6 +1538,17 @@ function PollView(): ReactElement {
 	)
 }
 
+const initialSettingsState: SettingsState = {
+	accounts: [],
+	providers: [],
+	settings: DEFAULT_SETTINGS,
+	gmailConfigured: false,
+}
+
+/**
+ * Renders the main App component, switching views based on url query.
+ * @returns React element representing the active view (PollView or SettingsView).
+ */
 const App = (): ReactElement => viewFromLocation() === 'poll' ? <PollView /> : <SettingsView />
 
 export default App
