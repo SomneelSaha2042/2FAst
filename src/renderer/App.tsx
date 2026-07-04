@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AccountAddRequest, ImapReconnectRequest, OtpResult, OtpSettings, PollStartPayload } from '../shared/ipc-api'
 import type { Account, ImapSecurity, Provider, ProviderDescriptor } from '../shared/models'
 import { getProviderDescriptor, isProvider } from '../shared/provider-registry'
+import logoUrl from './public/2FAst.png'
 
 const BYOC_GUIDE_URL = 'https://developers.google.com/identity/protocols/oauth2/native-app'
 const GOOGLE_CONSOLE_URL = 'https://console.cloud.google.com/'
@@ -116,7 +117,7 @@ function WindowChrome(props: WindowChromeProps): ReactElement {
 			{/* TopAppBar (Custom Title Bar) */}
 			<header className="fixed top-0 w-full h-8 flex items-center justify-between px-4 bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant z-50 select-none font-body-sm" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
 				<div className="flex items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-					<img src="/2FAst.png" alt="2Fast Logo" className="w-5 h-5 object-contain" />
+					<img src={logoUrl} alt="2Fast Logo" className="w-5 h-5 object-contain" />
 					<span className="font-bold text-primary font-headline-md text-sm">2Fast</span>
 					<span className="text-outline text-[10px] uppercase tracking-widest ml-2 opacity-70">
 						{isPollWindow ? `~/2fast/feed` : `~/2fast/${props.view}`}
