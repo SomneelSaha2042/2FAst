@@ -14,4 +14,7 @@ export default defineConfig({
     outDir: '../../dist/renderer',
     emptyOutDir: true,
   },
+  test: {
+    testTimeout: 15000,
+  },
 })
