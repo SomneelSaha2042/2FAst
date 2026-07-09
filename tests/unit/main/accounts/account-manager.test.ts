@@ -204,8 +204,9 @@ describe('account manager', () => {
 		expect(added.provider).toBe('outlook')
 		expect(added.email).toBe('outlook@example.com')
 		expect(added.oauthAccountId).toBe('ms-home-1')
-		expect(acquireMicrosoftAccessTokenMock).toHaveBeenLastCalledWith(added.id, 'ms-home-1')
-		expect(outlookProviderConstructorMock).toHaveBeenCalledWith(added.id, 'graph-access')
+		// The access token is no longer acquired during getProvider, so the last call was during fetchMicrosoftProfile
+		expect(acquireMicrosoftAccessTokenMock).toHaveBeenLastCalledWith(added.id)
+		expect(outlookProviderConstructorMock).toHaveBeenCalledWith(added.id, 'ms-home-1')
 	})
 
 	it('keeps the same Outlook account id when reconnecting and updates home account id', async () => {

@@ -2,7 +2,7 @@ import { app, BrowserWindow, Menu } from 'electron'
 import Store from 'electron-store'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { setMainWindowForIpc, setOtpPollService, setOnOpenSettings } from './ipc/index.js'
+import { setOtpPollService, setOnOpenSettings } from './ipc/index.js'
 import { loadGoogleOAuthConfig } from './oauth/google-config.js'
 import { OtpPollService } from './otp/poll-service.js'
 import { TrayController } from './tray.js'
@@ -127,7 +127,6 @@ const createSettingsWindow = (): BrowserWindow => {
 			preload: join(currentDir, '../preload/index.cjs'),
 		},
 	})
-	setMainWindowForIpc(window)
 	window.on('close', (event) => {
 		if (!isQuitting) {
 			event.preventDefault()
@@ -165,7 +164,6 @@ const createPollWindow = (): BrowserWindow => {
 			preload: join(currentDir, '../preload/index.cjs'),
 		},
 	})
-	setMainWindowForIpc(window)
 	window.on('close', (event) => {
 		if (!isQuitting) {
 			event.preventDefault()
@@ -183,11 +181,10 @@ const createPollWindow = (): BrowserWindow => {
 const openSettingsWindow = (): void => {
 	if (!settingsWindow) {
 		settingsWindow = createSettingsWindow()
+		void loadRendererView(settingsWindow, 'settings')
 	}
-	void loadRendererView(settingsWindow, 'settings').then(() => {
-		settingsWindow?.show()
-		settingsWindow?.focus()
-	})
+	settingsWindow.show()
+	settingsWindow.focus()
 }
 
 const toPollStartPayload = (account: Account): PollStartPayload => ({
@@ -231,6 +228,9 @@ app.whenReady().then(() => {
 			app.quit()
 		},
 	})
+
+	settingsWindow = createSettingsWindow()
+	void loadRendererView(settingsWindow, 'settings')
 
 	setOnOpenSettings(openSettingsWindow)
 

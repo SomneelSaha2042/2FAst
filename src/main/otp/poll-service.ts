@@ -44,6 +44,8 @@ export class OtpPollService {
 	private readonly otpStore: OtpStore
 	private config: PollServiceConfig
 	private readonly seenIds: Set<string>
+	private seenIdsDirty = false
+	private readonly folderCache = new Map<string, string[]>()
 	private readonly seenStore: Store<SeenStoreData>
 	private readonly seenStoreApi: StoreApi<SeenStoreData>
 	private readonly statusByAccountId = new Map<string, PollStatus>()
@@ -202,7 +204,12 @@ export class OtpPollService {
 			this.onOtpExpired(otpId)
 		}
 		// On-demand checks should re-evaluate the current recent window.
-		this.seenIds.clear()
+		for (const id of this.seenIds) {
+			if (id.startsWith(`${accountId}:`)) {
+				this.seenIds.delete(id)
+			}
+		}
+		this.seenIdsDirty = true
 		const account = accountManager.getAccount(accountId)
 		if (!account) {
 			throw new Error(`Account not found: ${accountId}`)
@@ -221,9 +228,13 @@ export class OtpPollService {
 		if (account.provider === 'outlook') {
 			folders = ['inbox', 'junkemail', 'deleteditems']
 		} else if (account.provider !== 'gmail') {
-			const all = await provider.listFolders()
-			folders = all.filter((f) => f.type === 'inbox' || f.type === 'junk' || f.type === 'trash').map((f) => f.id)
-			if (folders.length === 0) folders = undefined
+			let cached = this.folderCache.get(account.id)
+			if (!cached) {
+				const all = await provider.listFolders()
+				cached = all.filter((f) => f.type === 'inbox' || f.type === 'junk' || f.type === 'trash').map((f) => f.id)
+				this.folderCache.set(account.id, cached)
+			}
+			folders = cached.length > 0 ? cached : undefined
 		}
 
 		if (!folders) {
@@ -273,7 +284,10 @@ export class OtpPollService {
 				await this.writePollLog(
 					`[${new Date().toISOString()}] scan:item accountId=${account.id} messageId=${item.id} date=${item.date} from=${item.from.email} subjectLength=${item.subject.length}`
 				)
-				const message = await provider.getMessage(item.id)
+				let message = await provider.getMessage(item.id)
+				if (item.labelIds.length > 0 && message.labelIds.length === 0) {
+					message = { ...message, labelIds: item.labelIds }
+				}
 				const extracted = extractOtp(message.subject, message.bodyText ?? '', message.bodyHtml ?? '')
 				if (!extracted) {
 					await this.writePollLog(
@@ -297,6 +311,7 @@ export class OtpPollService {
 	}
 
 	private async pollAccount(account: Account, options?: { readonly includeSeen?: boolean }): Promise<void> {
+		const settings = getOtpSettings()
 		await this.writePollLog(
 			`[${new Date().toISOString()}] poll:start accountId=${account.id} email=${account.email} provider=${account.provider}`
 		)
@@ -309,14 +324,20 @@ export class OtpPollService {
 			await this.writePollLog(
 				`[${new Date().toISOString()}] poll:item accountId=${account.id} messageId=${item.id} date=${item.date} from=${item.from.email} subjectLength=${item.subject.length}`
 			)
-			if (!options?.includeSeen && this.seenIds.has(item.id)) {
+			const seenKey = `${account.id}:${item.id}`
+			if (!options?.includeSeen && (this.seenIds.has(seenKey) || this.seenIds.has(item.id))) {
 				await this.writePollLog(
 					`[${new Date().toISOString()}] poll:skip-seen accountId=${account.id} messageId=${item.id}`
 				)
 				continue
 			}
-			this.seenIds.add(item.id)
-			const message = await provider.getMessage(item.id)
+
+			this.seenIds.add(seenKey)
+			this.seenIdsDirty = true
+			let message = await provider.getMessage(item.id)
+			if (item.labelIds.length > 0 && message.labelIds.length === 0) {
+				message = { ...message, labelIds: item.labelIds }
+			}
 			await this.writePollLog(
 				`[${new Date().toISOString()}] poll:get accountId=${account.id} messageId=${message.id} receivedAt=${message.date} from=${message.from.email} subjectLength=${message.subject.length}`
 			)
@@ -335,7 +356,6 @@ export class OtpPollService {
 			await this.writePollLog(
 				`[${new Date().toISOString()}] poll:otp-detected accountId=${account.id} messageId=${message.id} code=${stored.code} type=${stored.type} confidence=${stored.confidence}`
 			)
-			const settings = getOtpSettings()
 			handleOtpDetected(stored, {
 				autoCopyToClipboard: settings.autoCopyToClipboard,
 				showNotifications: settings.showNotifications,
@@ -354,7 +374,10 @@ export class OtpPollService {
 	}
 
 	private persistSeenIds(): void {
-		this.seenStoreApi.set('seenMessageIds', Array.from(this.seenIds).slice(-500))
+		if (this.seenIdsDirty) {
+			this.seenStoreApi.set('seenMessageIds', Array.from(this.seenIds).slice(-1000))
+			this.seenIdsDirty = false
+		}
 	}
 
 	private async writePollLog(line: string): Promise<void> {

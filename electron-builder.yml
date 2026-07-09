@@ -1,7 +1,7 @@
 appId: com.2fast.app
 productName: 2Fast
 copyright: Copyright (c) 2026
-asar: true
+asar: false
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
 directories:
@@ -11,8 +11,12 @@ directories:
 files:
   - dist/**/*
   - package.json
+  - node_modules/**/*
   - '!dist/**/*.d.ts'
   - '!dist/**/*.tsbuildinfo'
+  - '!node_modules/.pnpm/**/*'
+  - '!node_modules/.modules.yaml'
+  - '!node_modules/.package-lock.json'
 
 extraResources:
   - from: resources
@@ -21,6 +25,7 @@ extraResources:
     to: assets
     filter:
       - 2FAst.png
+      - 2FAst.ico
 
 mac:
   target:
@@ -36,9 +41,8 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  icon: assets/2FAst.png
+  icon: assets/2FAst.ico
   executableName: 2Fast
-  signAndEditExecutable: false
 
 linux:
   target:
@@ -50,3 +54,5 @@ linux:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  installerIcon: assets/2FAst.ico
+  uninstallerIcon: assets/2FAst.ico

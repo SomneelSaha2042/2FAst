@@ -49,7 +49,7 @@ export class AccountManager {
 				return this.addMicrosoftAccount()
 			},
 			reconnect: async (account) => this.reconnectMicrosoftAccount(account),
-			getProvider: async (account) => new OutlookProvider(account.id, await acquireMicrosoftAccessToken(account.id, account.oauthAccountId)),
+			getProvider: async (account) => new OutlookProvider(account.id, account.oauthAccountId),
 		})
 		this.registerConnector({
 			providers: PROVIDER_REGISTRY.filter((descriptor) => descriptor.transport === 'imap').map((descriptor) => descriptor.id),
@@ -261,9 +261,17 @@ export class AccountManager {
 		const client = new google.auth.OAuth2({ clientId: oauthConfig.client_id, clientSecret: oauthConfig.client_secret })
 		client.setCredentials({ access_token: tokens.accessToken, refresh_token: tokens.refreshToken })
 		const oauth2 = google.oauth2({ version: 'v2', auth: client })
-		const { data } = await oauth2.userinfo.get()
-		if (!data.email) throw new Error('Google profile did not include an email address')
-		return { email: data.email, displayName: data.name ?? data.email, avatarUrl: data.picture ?? undefined }
+		try {
+			const { data } = await oauth2.userinfo.get()
+			if (!data.email) throw new Error('Google profile did not include an email address')
+			return { email: data.email, displayName: data.name ?? data.email, avatarUrl: data.picture ?? undefined }
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : String(error)
+			if (msg.includes('insufficient auth scopes') || msg.includes('Insufficient Permission')) {
+				throw new Error('Google rejected the login. Please make sure to check ALL the permission boxes when signing in.', { cause: error })
+			}
+			throw error
+		}
 	}
 
 	private async fetchMicrosoftProfile(accountId: string): Promise<{ email: string; displayName: string }> {

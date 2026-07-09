@@ -75,6 +75,7 @@ export interface OtpSource {
 	readonly subject: string
 	readonly sender: string
 	readonly receivedAt: string
+	readonly folder?: string
 }
 
 export interface OtpResult {

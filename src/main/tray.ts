@@ -89,6 +89,7 @@ export class TrayController {
 	private readonly tray: Tray
 	private readonly context: TrayContext
 	private highlightTimer: NodeJS.Timeout | null = null
+	private refreshTimer: NodeJS.Timeout | null = null
 	private readonly normalIcon
 	private readonly activeIcon
 	private scanCount = 0
@@ -133,8 +134,14 @@ export class TrayController {
 	}
 
 	refreshMenu(): void {
-		const menu = Menu.buildFromTemplate(buildTrayMenuTemplate(this.context))
-		this.tray.setContextMenu(menu)
+		if (this.refreshTimer) {
+			clearTimeout(this.refreshTimer)
+		}
+		this.refreshTimer = setTimeout(() => {
+			this.refreshTimer = null
+			const menu = Menu.buildFromTemplate(buildTrayMenuTemplate(this.context))
+			this.tray.setContextMenu(menu)
+		}, 50)
 	}
 
 	private loadIcon(file: string) {

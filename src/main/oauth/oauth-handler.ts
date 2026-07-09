@@ -203,6 +203,7 @@ const buildAuthUrl = (
 	url.searchParams.set('code_challenge_method', 'S256')
 	url.searchParams.set('access_type', 'offline')
 	url.searchParams.set('prompt', 'consent select_account')
+	url.searchParams.set('include_granted_scopes', 'true')
 	url.searchParams.set('state', state)
 	return url.toString()
 }

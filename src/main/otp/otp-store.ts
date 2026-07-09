@@ -1,9 +1,9 @@
 import Store from 'electron-store'
 import { randomUUID } from 'node:crypto'
-import type { OtpMatch, OtpSource } from './patterns.js'
 
-export interface OtpResult extends OtpMatch { readonly source: OtpSource }
-export interface StoredOtp extends OtpResult { readonly id: string; readonly detectedAt: string; readonly copiedCount: number; readonly expired: boolean }
+import type { StoredOtp, OtpResult } from '../../shared/ipc-api.js'
+
+export type { OtpResult, StoredOtp }
 interface OtpStoreData { readonly otpHistory: readonly StoredOtp[] }
 interface StoreApi<T> { get: <K extends keyof T>(key: K) => T[K]; set: <K extends keyof T>(key: K, value: T[K]) => void }
 

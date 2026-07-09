@@ -154,6 +154,8 @@ const mapGmailMessage = (
 
 export class GmailProvider implements MailProvider {
 	readonly provider = 'gmail' as const
+	private cachedClient: gmail_v1.Gmail | null = null
+	private lastTokenRefresh: number = 0
 
 	constructor(
 		private readonly accountId: string,
@@ -169,6 +171,7 @@ export class GmailProvider implements MailProvider {
 	async listMessages(options?: ListMessagesOptions): Promise<ListMessagesResult> {
 		const gmail = await this.getClient()
 		const queryParts = [
+			options?.labelId ? undefined : '(in:inbox OR in:spam OR in:trash)',
 			options?.query,
 			options?.searchText,
 			options?.receivedAfter
@@ -178,7 +181,7 @@ export class GmailProvider implements MailProvider {
 		const response = await gmail.users.messages.list({
 			userId: 'me',
 			labelIds: options?.labelId ? [options.labelId] : undefined,
-			q: queryParts.length > 0 ? queryParts.join(' ') : (options?.labelId ? undefined : 'in:inbox OR in:spam OR in:trash'),
+			q: queryParts.length > 0 ? queryParts.join(' ') : undefined,
 			pageToken: options?.pageToken,
 			maxResults: options?.maxResults ?? DEFAULT_MAX_RESULTS,
 			includeSpamTrash: true,
@@ -346,13 +349,10 @@ export class GmailProvider implements MailProvider {
 	private async getClient(): Promise<gmail_v1.Gmail> {
 		const tokens = await loadTokens(this.accountId)
 		if (!tokens) {
+			this.cachedClient = null
 			throw new Error('Account is missing OAuth tokens. Reconnect the account.')
 		}
 
-		const oauthClient = new google.auth.OAuth2({
-			clientId: this.clientId,
-			clientSecret: this.clientSecret,
-		})
 		const refreshConfig: OAuthConfig = {
 			authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
 			tokenUrl: GOOGLE_TOKEN_URL,
@@ -361,10 +361,23 @@ export class GmailProvider implements MailProvider {
 			scopes: [],
 		}
 		const validTokens = await ensureValidAccessToken(this.accountId, refreshConfig, tokens)
+		
+		if (this.cachedClient && this.lastTokenRefresh === validTokens.expiresAt) {
+			return this.cachedClient
+		}
+
+		const oauthClient = new google.auth.OAuth2({
+			clientId: this.clientId,
+			clientSecret: this.clientSecret,
+		})
+		
 		oauthClient.setCredentials({
 			access_token: validTokens.accessToken,
 			refresh_token: validTokens.refreshToken,
 		})
-		return google.gmail({ version: 'v1', auth: oauthClient })
+		
+		this.cachedClient = google.gmail({ version: 'v1', auth: oauthClient })
+		this.lastTokenRefresh = validTokens.expiresAt
+		return this.cachedClient
 	}
 }

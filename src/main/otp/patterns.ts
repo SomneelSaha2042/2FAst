@@ -1,12 +1,6 @@
 import type { Message } from '../../shared/models.js'
 
-export interface OtpSource {
-	readonly messageId: string
-	readonly accountId: string
-	readonly subject: string
-	readonly sender: string
-	readonly receivedAt: string
-}
+import type { OtpSource } from '../../shared/ipc-api.js'
 
 export interface OtpMatch {
 	readonly code: string
@@ -72,13 +66,18 @@ const stripHtml = (value: string): string =>
 		.replace(/\s+/g, ' ')
 		.trim()
 
-const hasTriggerWord = (text: string): boolean => {
+export const hasTriggerWord = (text: string): boolean => {
 	const normalized = text.toLowerCase()
 	return TRIGGER_WORDS.some((word) => normalized.includes(word))
 }
 
-const hasStrongTrigger = (text: string): boolean =>
-	STRONG_TRIGGER_PATTERNS.some((pattern) => pattern.test(text))
+export const hasStrongTrigger = (text: string): boolean => {
+	const normalized = text.toLowerCase()
+	if (!TRIGGER_WORDS.some(w => normalized.includes(w)) && !normalized.includes('confirm') && !normalized.includes('temporary')) {
+		return false
+	}
+	return STRONG_TRIGGER_PATTERNS.some((pattern) => pattern.test(text))
+}
 
 const isPromoLike = (subject: string, body: string): boolean => {
 	const normalizedSubject = subject.toLowerCase()
@@ -304,6 +303,17 @@ export function extractOtp(subject: string, bodyText: string, bodyHtml: string):
 	return null
 }
 
+const getPrimaryFolder = (labelIds?: readonly string[]): string | undefined => {
+	if (!labelIds || labelIds.length === 0) return undefined
+	const exclude = new Set(['UNREAD', 'STARRED', 'IMPORTANT', 'CATEGORY_PERSONAL', 'CATEGORY_SOCIAL', 'CATEGORY_PROMOTIONS', 'CATEGORY_UPDATES', 'CATEGORY_FORUMS', 'SENT'])
+	const primary = labelIds.find(l => !exclude.has(l.toUpperCase()))
+	if (!primary) return labelIds[0]
+	
+	// Clean up Gmail internal label names (e.g. INBOX, SPAM, TRASH) to be more readable if needed, 
+	// but the UI will uppercase it anyway. We can just return it.
+	return primary
+}
+
 /**
  * Creates OTP extraction source metadata from a message.
  * @param message Full provider message payload.
@@ -316,5 +326,6 @@ export function buildOtpSource(message: Message): OtpSource {
 		subject: message.subject,
 		sender: message.from.email,
 		receivedAt: message.date,
+		folder: getPrimaryFolder(message.labelIds)
 	}
 }

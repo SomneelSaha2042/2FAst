@@ -2,6 +2,7 @@ import { Client } from '@microsoft/microsoft-graph-client'
 import type { DraftMessage } from '../../shared/ipc-api.js'
 import type { Label, MailFolder, Message, MessageAddress, Thread } from '../../shared/models.js'
 import type { ListMessagesOptions, ListMessagesResult, MailProvider } from './types.js'
+import { acquireMicrosoftAccessToken } from '../oauth/microsoft-auth.js'
 
 const DEFAULT_MAX_RESULTS = 50
 const GRAPH_MESSAGE_SELECT =
@@ -58,7 +59,7 @@ const mapAddresses = (recipients?: readonly GraphRecipient[]): MessageAddress[] 
 		.map((recipient) => mapAddress(recipient))
 		.filter((recipient) => recipient.email.length > 0)
 
-const mapMessage = (accountId: string, source: GraphMessage, includeBody: boolean): Message => ({
+const mapMessage = (accountId: string, source: GraphMessage, includeBody: boolean, folderId?: string): Message => ({
 	id: source.id ?? '',
 	accountId,
 	threadId: source.conversationId ?? source.id ?? '',
@@ -70,7 +71,7 @@ const mapMessage = (accountId: string, source: GraphMessage, includeBody: boolea
 	snippet: source.bodyPreview ?? '',
 	bodyHtml: includeBody ? source.body?.content ?? undefined : undefined,
 	bodyText: includeBody && source.body?.contentType === 'text' ? source.body.content : undefined,
-	labelIds: [],
+	labelIds: folderId ? [folderId] : [],
 	isRead: Boolean(source.isRead),
 	isStarred: source.flag?.flagStatus === 'flagged',
 	attachments: source.hasAttachments
@@ -100,7 +101,7 @@ export class OutlookProvider implements MailProvider {
 
 	constructor(
 		private readonly accountId: string,
-		private readonly accessToken: string
+		private readonly oauthAccountId?: string
 	) {}
 
 	/**
@@ -128,7 +129,7 @@ export class OutlookProvider implements MailProvider {
 			request = request.skip(Number.isFinite(skip) ? skip : 0)
 		}
 		const response = (await request.get()) as GraphMessageListResponse
-		const messages = (response.value ?? []).map((message) => mapMessage(this.accountId, message, false))
+		const messages = (response.value ?? []).map((message) => mapMessage(this.accountId, message, false, options?.folderId))
 		return {
 			messages,
 			nextPageToken: extractNextPageToken(response['@odata.nextLink']),
@@ -256,8 +257,14 @@ export class OutlookProvider implements MailProvider {
 
 	private getClient(): Client {
 		return Client.init({
-			authProvider: (done: (error: Error | null, accessToken: string | null) => void) =>
-				done(null, this.accessToken),
+			authProvider: async (done: (error: Error | null, accessToken: string | null) => void) => {
+				try {
+					const token = await acquireMicrosoftAccessToken(this.accountId, this.oauthAccountId)
+					done(null, token)
+				} catch (error) {
+					done(error instanceof Error ? error : new Error(String(error)), null)
+				}
+			},
 		})
 	}
 }

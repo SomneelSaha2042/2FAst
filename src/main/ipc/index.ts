@@ -52,7 +52,6 @@ const isGoogleOAuthConfigInput = (value: unknown): value is { gmailEmail: string
 }
 
 let otpPollService: OtpPollService | null = null
-let mainWindow: BrowserWindow | null = null
 
 /**
  * Injects the OTP poll service for IPC handlers.
@@ -61,15 +60,6 @@ let mainWindow: BrowserWindow | null = null
  */
 export const setOtpPollService = (service: OtpPollService): void => {
 	otpPollService = service
-}
-
-/**
- * Injects the main window for window control handlers.
- * @param window Browser window instance.
- * @returns Void.
- */
-export const setMainWindowForIpc = (window: BrowserWindow): void => {
-	mainWindow = window
 }
 
 let onOpenSettingsCallback: (() => void) | null = null
@@ -209,10 +199,10 @@ const registerIpcHandlers = (): void => {
 	})
 
 	ipcMain.handle('window:hide', async (event): Promise<IpcResult<void>> => {
-		try { (BrowserWindow.fromWebContents(event.sender) ?? mainWindow)?.hide(); return { success: true } } catch (error) { return formatError(error) }
+		try { BrowserWindow.fromWebContents(event.sender)?.hide(); return { success: true } } catch (error) { return formatError(error) }
 	})
 	ipcMain.handle('window:minimize', async (event): Promise<IpcResult<void>> => {
-		try { (BrowserWindow.fromWebContents(event.sender) ?? mainWindow)?.minimize(); return { success: true } } catch (error) { return formatError(error) }
+		try { BrowserWindow.fromWebContents(event.sender)?.minimize(); return { success: true } } catch (error) { return formatError(error) }
 	})
 	ipcMain.handle('window:openSettings', async (): Promise<IpcResult<void>> => {
 		try {
