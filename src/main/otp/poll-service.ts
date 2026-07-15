@@ -178,6 +178,13 @@ export class OtpPollService {
 		return [...this.recentParsedMessages]
 	}
 
+	private addRecentParsedMessage(message: Message): void {
+		this.recentParsedMessages.unshift(message)
+		if (this.recentParsedMessages.length > 5) {
+			this.recentParsedMessages.pop()
+		}
+	}
+
 	/**
 	 * Executes one polling cycle for all accounts.
 	 * @returns Promise that resolves after cycle completion.
@@ -297,10 +304,7 @@ export class OtpPollService {
 				if (item.labelIds.length > 0 && message.labelIds.length === 0) {
 					message = { ...message, labelIds: item.labelIds }
 				}
-				this.recentParsedMessages.unshift(message)
-				if (this.recentParsedMessages.length > 5) {
-					this.recentParsedMessages.pop()
-				}
+				this.addRecentParsedMessage(message)
 				const extracted = extractOtp(message.subject, message.bodyText ?? '', message.bodyHtml ?? '')
 				if (!extracted) {
 					await this.writePollLog(
@@ -355,10 +359,7 @@ export class OtpPollService {
 				`[${new Date().toISOString()}] poll:get accountId=${account.id} messageId=${message.id} receivedAt=${message.date} from=${message.from.email} subjectLength=${message.subject.length}`
 			)
 
-			this.recentParsedMessages.unshift(message)
-			if (this.recentParsedMessages.length > 5) {
-				this.recentParsedMessages.pop()
-			}
+			this.addRecentParsedMessage(message)
 
 			const extracted = extractOtp(message.subject, message.bodyText ?? '', message.bodyHtml ?? '')
 			if (!extracted) {

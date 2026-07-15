@@ -27,7 +27,7 @@ export default function RecentEmailsView(): ReactElement {
 	}, [])
 
 	return (
-		<WindowChrome>
+		<WindowChrome title="Recent Emails" view="recent-emails">
 			<div className="w-full h-full bg-background flex flex-col font-sans select-none text-on-surface">
 				<header className="h-10 shrink-0 flex items-center px-4 bg-surface-container draggable border-b border-outline-variant/30 relative">
 					<h1 className="font-body-sm font-semibold tracking-wide">Recent Emails</h1>

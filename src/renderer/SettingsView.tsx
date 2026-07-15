@@ -1,22 +1,14 @@
 import React, { ReactElement, useCallback, useEffect, useMemo, useState } from 'react'
 import type { AccountAddRequest, ImapReconnectRequest, OtpResult, OtpSettings } from '../shared/ipc-api'
-import type { Account, ImapSecurity, Provider, Message } from '../shared/models'
+import type { Account, ImapSecurity, Provider } from '../shared/models'
 import { getProviderDescriptor } from '../shared/provider-registry'
-import { BYOC_GUIDE_URL, GOOGLE_CONSOLE_URL, GOOGLE_CREDENTIALS_URL, DEFAULT_SETTINGS, getApi, SettingsPage, settingsPageFromLocation, SettingsState, PollState, GmailSaveState, providerLabel, shortClientId, formatTimestamp, WindowChrome, CopyLinkButton } from './shared'
+import { BYOC_GUIDE_URL, GOOGLE_CONSOLE_URL, GOOGLE_CREDENTIALS_URL, DEFAULT_SETTINGS, getApi, SettingsPage, settingsPageFromLocation, SettingsState, PollState, GmailSaveState, providerLabel, shortClientId, formatTimestamp, WindowChrome, CopyLinkButton, openRecentEmailsWindow } from './shared'
 function CodesDashboard(props: { readonly accounts: readonly Account[] }): ReactElement {
 	const [selectedAccountId, setSelectedAccountId] = useState<string>(props.accounts[0]?.id || '')
 	const [scanState, setScanState] = useState<PollState>('idle')
 	const [candidates, setCandidates] = useState<readonly OtpResult[]>([])
 	const [copiedCode, setCopiedCode] = useState<string | null>(null)
 	const [error, setError] = useState<string | null>(null)
-
-	const openRecentEmailsWindow = useCallback(async () => {
-		const api = getApi()
-		if (api) {
-			await api['window:openRecentEmails']()
-		}
-	}, [])
-
 	const selectedAccount = useMemo(() =>
 		props.accounts.find((a) => a.id === selectedAccountId) || props.accounts[0],
 	[props.accounts, selectedAccountId])
@@ -132,7 +124,7 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 						{/* Candidates codes list */}
 						<div className="space-y-2 text-left">
 							<div className="flex items-center justify-between mb-1 select-none">
-								<button type="button" onClick={openRecentEmailsWindow} className="text-[11px] text-primary hover:underline cursor-pointer">
+								<button type="button" onClick={() => void openRecentEmailsWindow()} className="text-[11px] text-primary hover:underline cursor-pointer">
 									Missed an OTP? View recent emails
 								</button>
 								<span className="font-label-md text-secondary/80 uppercase tracking-wider">LIVE</span>

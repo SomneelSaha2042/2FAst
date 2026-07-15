@@ -1,20 +1,12 @@
 import React, { ReactElement, useCallback, useEffect, useState } from 'react'
 import type { OtpResult, PollStartPayload } from '../shared/ipc-api'
-import type { Message } from '../shared/models'
-import { getApi, getEvents, pollPayloadFromLocation, formatTimestamp, WindowChrome, automaticPollScans, providerLabel, PollState, pollPayloadKey } from './shared'
+import { getApi, getEvents, pollPayloadFromLocation, formatTimestamp, WindowChrome, automaticPollScans, providerLabel, PollState, pollPayloadKey, openRecentEmailsWindow } from './shared'
 function PollView(): ReactElement {
 	const [target, setTarget] = useState<PollStartPayload | null>(pollPayloadFromLocation())
 	const [scanState, setScanState] = useState<PollState>('idle')
 	const [candidates, setCandidates] = useState<readonly OtpResult[]>([])
 	const [copiedCode, setCopiedCode] = useState<string | null>(null)
 	const [error, setError] = useState<string | null>(null)
-
-	const openRecentEmailsWindow = useCallback(async () => {
-		const api = getApi()
-		if (api) {
-			await api['window:openRecentEmails']()
-		}
-	}, [])
 
 	const runScan = useCallback(async (
 		payload: PollStartPayload,
@@ -217,7 +209,7 @@ function PollView(): ReactElement {
 					{/* Candidates list */}
 					<div className="flex-1 flex flex-col gap-2 mt-4 min-h-0">
 						<div className="flex items-center justify-between mb-2 shrink-0">
-							<button type="button" onClick={openRecentEmailsWindow} className="text-[10px] text-primary hover:underline cursor-pointer select-none">
+							<button type="button" onClick={() => void openRecentEmailsWindow()} className="text-[10px] text-primary hover:underline cursor-pointer select-none">
 								Missed an OTP? View recent emails
 							</button>
 							<span className="text-[11px] font-label-md select-none text-secondary/80">LIVE</span>

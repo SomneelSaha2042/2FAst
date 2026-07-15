@@ -37,9 +37,16 @@ export const viewFromLocation = (): AppView => {
 	return 'settings'
 }
 
+export const openRecentEmailsWindow = async (): Promise<void> => {
+	const api = getApi()
+	if (api) {
+		await api['window:openRecentEmails']()
+	}
+}
+
 export const settingsPageFromLocation = (): SettingsPage => {
 	const view = viewFromLocation()
-	return view === 'poll' ? 'settings' : view
+	return (view === 'poll' || view === 'recent-emails') ? 'settings' : view
 }
 
 export const pollPayloadFromLocation = (): PollStartPayload | null => {
