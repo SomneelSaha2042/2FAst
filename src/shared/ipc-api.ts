@@ -162,6 +162,7 @@ export interface IpcApi {
 	'otp:copy': (otpId: string) => Promise<IpcResult<{ code: string | null }>>
 	'otp:getHistory': () => Promise<IpcResult<StoredOtp[]>>
 	'otp:clearHistory': () => Promise<IpcResult<void>>
+	'otp:getRecentParsedMessages': () => Promise<IpcResult<Message[]>>
 	'poll:pause': () => Promise<IpcResult<void>>
 	'poll:resume': () => Promise<IpcResult<void>>
 	'poll:setInterval': (ms: number) => Promise<IpcResult<void>>
@@ -197,6 +198,7 @@ export const IPC_CHANNELS = [
 	'otp:copy',
 	'otp:getHistory',
 	'otp:clearHistory',
+	'otp:getRecentParsedMessages',
 	'poll:pause',
 	'poll:resume',
 	'poll:setInterval',

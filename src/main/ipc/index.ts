@@ -168,6 +168,9 @@ const registerIpcHandlers = (): void => {
 	ipcMain.handle('otp:clearHistory', async (): Promise<IpcResult<void>> => {
 		try { if (!otpPollService) throw new Error('OTP polling service is not initialized'); otpPollService.clearHistory(); return { success: true } } catch (error) { return formatError(error) }
 	})
+	ipcMain.handle('otp:getRecentParsedMessages', async (): Promise<IpcResult<unknown>> => {
+		try { if (!otpPollService) throw new Error('OTP polling service is not initialized'); return { success: true, data: otpPollService.getRecentParsedMessages() } } catch (error) { return formatError(error) }
+	})
 
 	ipcMain.handle('poll:pause', async (): Promise<IpcResult<void>> => {
 		try { if (!otpPollService) throw new Error('OTP polling service is not initialized'); otpPollService.pause(); return { success: true } } catch (error) { return formatError(error) }

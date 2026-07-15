@@ -51,6 +51,7 @@ export class OtpPollService {
 	private readonly statusByAccountId = new Map<string, PollStatus>()
 	private timer: NodeJS.Timeout | null = null
 	private paused = false
+	private recentParsedMessages: Message[] = []
 	private readonly onOtpDetected: (otp: StoredOtp) => void
 	private readonly onOtpExpired: (otpId: string) => void
 	private readonly onPollStatus: (status: PollStatus) => void
@@ -167,6 +168,14 @@ export class OtpPollService {
 	 */
 	clearHistory(): void {
 		this.otpStore.clearHistory()
+	}
+
+	/**
+	 * Retrieves the last 5 parsed messages.
+	 * @returns The recent messages.
+	 */
+	getRecentParsedMessages(): Message[] {
+		return [...this.recentParsedMessages]
 	}
 
 	/**
@@ -341,6 +350,12 @@ export class OtpPollService {
 			await this.writePollLog(
 				`[${new Date().toISOString()}] poll:get accountId=${account.id} messageId=${message.id} receivedAt=${message.date} from=${message.from.email} subjectLength=${message.subject.length}`
 			)
+
+			this.recentParsedMessages.unshift(message)
+			if (this.recentParsedMessages.length > 5) {
+				this.recentParsedMessages.pop()
+			}
+
 			const extracted = extractOtp(message.subject, message.bodyText ?? '', message.bodyHtml ?? '')
 			if (!extracted) {
 				await this.writePollLog(

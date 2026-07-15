@@ -31,6 +31,7 @@ const api: { [K in keyof IpcApi]: IpcApi[K] } = {
 	'otp:copy': (otpId) => ipcRenderer.invoke('otp:copy', otpId),
 	'otp:getHistory': () => ipcRenderer.invoke('otp:getHistory'),
 	'otp:clearHistory': () => ipcRenderer.invoke('otp:clearHistory'),
+	'otp:getRecentParsedMessages': () => ipcRenderer.invoke('otp:getRecentParsedMessages'),
 	'poll:pause': () => ipcRenderer.invoke('poll:pause'),
 	'poll:resume': () => ipcRenderer.invoke('poll:resume'),
 	'poll:setInterval': (ms) => ipcRenderer.invoke('poll:setInterval', ms),

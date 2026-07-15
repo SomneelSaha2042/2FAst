@@ -26,6 +26,7 @@ describe('IPC channel list', () => {
 			'otp:copy',
 			'otp:getHistory',
 			'otp:clearHistory',
+			'otp:getRecentParsedMessages',
 			'poll:pause',
 			'poll:resume',
 			'poll:setInterval',
