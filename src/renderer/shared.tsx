@@ -25,13 +25,13 @@ export const getApi = (): Window['api'] | null =>
 export const getEvents = (): Window['events'] | null =>
 	(window as Window & { events?: Window['events'] }).events ?? null
 
-export type AppView = 'settings' | 'add-account' | 'gmail-setup' | 'preferences' | 'codes' | 'poll'
+export type AppView = 'settings' | 'add-account' | 'gmail-setup' | 'preferences' | 'codes' | 'poll' | 'recent-emails'
 export type SettingsPage = 'settings' | 'add-account' | 'gmail-setup' | 'preferences' | 'codes'
 
 export const viewFromLocation = (): AppView => {
 	const params = new URLSearchParams(window.location.search)
 	const view = params.get('view')
-	if (view === 'poll' || view === 'gmail-setup' || view === 'add-account' || view === 'preferences' || view === 'codes') {
+	if (view === 'poll' || view === 'gmail-setup' || view === 'add-account' || view === 'preferences' || view === 'codes' || view === 'recent-emails') {
 		return view
 	}
 	return 'settings'

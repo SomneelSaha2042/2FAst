@@ -10,18 +10,10 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 	const [copiedCode, setCopiedCode] = useState<string | null>(null)
 	const [error, setError] = useState<string | null>(null)
 
-	const [showRecent, setShowRecent] = useState(false)
-	const [recentMessages, setRecentMessages] = useState<Message[]>([])
-	const [expandedMsgId, setExpandedMsgId] = useState<string | null>(null)
-
-	const loadRecent = useCallback(async () => {
+	const openRecentEmailsWindow = useCallback(async () => {
 		const api = getApi()
 		if (api) {
-			const res = await api['otp:getRecentParsedMessages']()
-			if (res.success && res.data) {
-				setRecentMessages(res.data)
-				setShowRecent(true)
-			}
+			await api['window:openRecentEmails']()
 		}
 	}, [])
 
@@ -137,84 +129,52 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 							</div>
 						)}
 
-						{/* Candidates codes list / Recent Messages */}
+						{/* Candidates codes list */}
 						<div className="space-y-2 text-left">
-							{!showRecent ? (
-								<>
-									<div className="flex items-center justify-between mb-1 select-none">
-										<button type="button" onClick={loadRecent} className="text-[11px] text-primary hover:underline cursor-pointer">
-											Missed an OTP? View recent emails
-										</button>
-										<span className="font-label-md text-secondary/80 uppercase tracking-wider">LIVE</span>
-									</div>
+							<div className="flex items-center justify-between mb-1 select-none">
+								<button type="button" onClick={openRecentEmailsWindow} className="text-[11px] text-primary hover:underline cursor-pointer">
+									Missed an OTP? View recent emails
+								</button>
+								<span className="font-label-md text-secondary/80 uppercase tracking-wider">LIVE</span>
+							</div>
 
-									<div className="space-y-2">
-										{candidates.map((candidate, idx) => (
-											<div
-												key={`${candidate.source.messageId}-${candidate.code}-${idx}`}
-												className={`rounded p-3 flex items-center justify-between transition-all group cursor-pointer ${
-													idx === 0 ? 'warp-block-active' : 'warp-block opacity-80 hover:opacity-100'
-												}`}
-											>
-												<div className="flex flex-col gap-1 min-w-0">
-													<span className={`font-code-otp text-code-otp leading-tight select-text ${idx === 0 ? 'text-primary' : 'text-on-surface-variant'}`}>{candidate.code}</span>
-													<div className="flex items-center gap-1.5 min-w-0 max-w-[320px] mt-0.5">
-														<span className="font-body-sm text-outline text-[11px] truncate">{candidate.source.sender}</span>
-														{candidate.source.folder && <span className="px-1 py-[1px] bg-surface-container-highest text-[9px] text-outline rounded uppercase tracking-wider shrink-0">{candidate.source.folder}</span>}
-													</div>
-													<span className="font-body-sm text-outline/60 text-[10px] truncate max-w-[320px]">
-														{formatTimestamp(candidate.source.receivedAt)} - {candidate.source.subject}
-													</span>
-												</div>
-												<button
-													type="button"
-													title={copiedCode === candidate.code ? 'Copied' : 'Copy code'}
-													className="text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-2 rounded hover:bg-surface-bright shrink-0"
-													onClick={() => void copyCandidate(candidate)}
-												>
-													<span className="material-symbols-outlined text-[18px]">
-														{copiedCode === candidate.code ? 'check' : 'content_copy'}
-													</span>
-												</button>
+							<div className="space-y-2">
+								{candidates.map((candidate, idx) => (
+									<div
+										key={`${candidate.source.messageId}-${candidate.code}-${idx}`}
+										className={`rounded p-3 flex items-center justify-between transition-all group cursor-pointer ${
+											idx === 0 ? 'warp-block-active' : 'warp-block opacity-80 hover:opacity-100'
+										}`}
+									>
+										<div className="flex flex-col gap-1 min-w-0">
+											<span className={`font-code-otp text-code-otp leading-tight select-text ${idx === 0 ? 'text-primary' : 'text-on-surface-variant'}`}>{candidate.code}</span>
+											<div className="flex items-center gap-1.5 min-w-0 max-w-[320px] mt-0.5">
+												<span className="font-body-sm text-outline text-[11px] truncate">{candidate.source.sender}</span>
+												{candidate.source.folder && <span className="px-1 py-[1px] bg-surface-container-highest text-[9px] text-outline rounded uppercase tracking-wider shrink-0">{candidate.source.folder}</span>}
 											</div>
-										))}
-										{scanState === 'complete' && candidates.length === 0 && (
-											<p className="font-body-sm text-outline text-center py-6 bg-surface-container/30 rounded-lg">No OTP codes found in the latest emails.</p>
-										)}
-										{scanState === 'idle' && (
-											<p className="font-body-sm text-outline text-center py-6 bg-surface-container/30 rounded-lg">Scanning email inbox...</p>
-										)}
-									</div>
-								</>
-							) : (
-								<div className="space-y-2">
-									<div className="flex items-center justify-between mb-1 select-none border-b border-surface-container-highest pb-2">
-										<span className="font-label-md text-on-surface uppercase tracking-wider">Recent 5 Emails Parsed</span>
-										<button type="button" onClick={() => setShowRecent(false)} className="text-[11px] text-primary hover:underline cursor-pointer">
-											Back
+											<span className="font-body-sm text-outline/60 text-[10px] truncate max-w-[320px]">
+												{formatTimestamp(candidate.source.receivedAt)} - {candidate.source.subject}
+											</span>
+										</div>
+										<button
+											type="button"
+											title={copiedCode === candidate.code ? 'Copied' : 'Copy code'}
+											className="text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-2 rounded hover:bg-surface-bright shrink-0"
+											onClick={() => void copyCandidate(candidate)}
+										>
+											<span className="material-symbols-outlined text-[18px]">
+												{copiedCode === candidate.code ? 'check' : 'content_copy'}
+											</span>
 										</button>
 									</div>
-									{recentMessages.length === 0 ? (
-										<p className="font-body-sm text-outline text-center py-6 bg-surface-container/30 rounded-lg">No recent emails parsed. Click 'Scan Again' to check the inbox.</p>
-									) : recentMessages.map((msg) => (
-										<div key={msg.id} className="warp-block rounded p-3 flex flex-col gap-1 transition-all">
-											<div 
-												className="flex flex-col gap-1 cursor-pointer group"
-												onClick={() => setExpandedMsgId(expandedMsgId === msg.id ? null : msg.id)}
-											>
-												<span className="font-body-sm text-primary text-[12px] truncate w-full group-hover:underline">{msg.from.name || msg.from.email}</span>
-												<span className="font-body-sm text-on-surface-variant text-[12px] truncate w-full">{msg.subject}</span>
-												<span className="font-body-sm text-outline text-[10px]">{formatTimestamp(msg.date ?? '')}</span>
-											</div>
-											{expandedMsgId === msg.id && (
-												<div className="mt-2 pt-2 border-t border-surface-container-highest text-[11px] text-outline font-body-sm whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto">
-													{msg.bodyText || msg.snippet || 'No text content available.'}
-												</div>
-											)}
-										</div>
-									))}
-								</div>
-							)}
+								))}
+								{scanState === 'complete' && candidates.length === 0 && (
+									<p className="font-body-sm text-outline text-center py-6 bg-surface-container/30 rounded-lg">No OTP codes found in the latest emails.</p>
+								)}
+								{scanState === 'idle' && (
+									<p className="font-body-sm text-outline text-center py-6 bg-surface-container/30 rounded-lg">Scanning email inbox...</p>
+								)}
+							</div>
 						</div>
 					</>
 				)}

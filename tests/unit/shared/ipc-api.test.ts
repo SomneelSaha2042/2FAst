@@ -37,6 +37,7 @@ describe('IPC channel list', () => {
 			'window:hide',
 			'window:minimize',
 			'window:openSettings',
+			'window:openRecentEmails',
 		]
 
 		expect(IPC_CHANNELS).toEqual(expected)

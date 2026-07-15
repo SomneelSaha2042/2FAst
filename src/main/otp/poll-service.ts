@@ -297,6 +297,10 @@ export class OtpPollService {
 				if (item.labelIds.length > 0 && message.labelIds.length === 0) {
 					message = { ...message, labelIds: item.labelIds }
 				}
+				this.recentParsedMessages.unshift(message)
+				if (this.recentParsedMessages.length > 5) {
+					this.recentParsedMessages.pop()
+				}
 				const extracted = extractOtp(message.subject, message.bodyText ?? '', message.bodyHtml ?? '')
 				if (!extracted) {
 					await this.writePollLog(

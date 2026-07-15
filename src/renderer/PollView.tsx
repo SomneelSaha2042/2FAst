@@ -9,18 +9,10 @@ function PollView(): ReactElement {
 	const [copiedCode, setCopiedCode] = useState<string | null>(null)
 	const [error, setError] = useState<string | null>(null)
 
-	const [showRecent, setShowRecent] = useState(false)
-	const [recentMessages, setRecentMessages] = useState<Message[]>([])
-	const [expandedMsgId, setExpandedMsgId] = useState<string | null>(null)
-
-	const loadRecent = useCallback(async () => {
+	const openRecentEmailsWindow = useCallback(async () => {
 		const api = getApi()
 		if (api) {
-			const res = await api['otp:getRecentParsedMessages']()
-			if (res.success && res.data) {
-				setRecentMessages(res.data)
-				setShowRecent(true)
-			}
+			await api['window:openRecentEmails']()
 		}
 	}, [])
 
@@ -222,96 +214,62 @@ function PollView(): ReactElement {
 						)}
 					</div>
 
-					{/* Candidates list / Recent Messages */}
-					{!showRecent ? (
-						<>
-							<div className="flex-1 flex flex-col gap-2 mt-4 min-h-0">
-								<div className="flex items-center justify-between mb-2 shrink-0">
-									<button type="button" onClick={loadRecent} className="text-[10px] text-primary hover:underline cursor-pointer select-none">
-										Missed an OTP? View recent emails
-									</button>
-									<span className="text-[11px] font-label-md select-none text-secondary/80">LIVE</span>
-								</div>
+					{/* Candidates list */}
+					<div className="flex-1 flex flex-col gap-2 mt-4 min-h-0">
+						<div className="flex items-center justify-between mb-2 shrink-0">
+							<button type="button" onClick={openRecentEmailsWindow} className="text-[10px] text-primary hover:underline cursor-pointer select-none">
+								Missed an OTP? View recent emails
+							</button>
+							<span className="text-[11px] font-label-md select-none text-secondary/80">LIVE</span>
+						</div>
 
-								<div className="space-y-1.5 overflow-y-auto pr-1 flex-1 min-h-0">
-									{candidates.map((candidate, idx) => (
-										<div
-											key={`${candidate.source.messageId}-${candidate.code}-${idx}`}
-											className={`rounded p-3 flex items-center justify-between transition-all group cursor-pointer ${
-												idx === 0 ? 'warp-block-active' : 'warp-block opacity-80 hover:opacity-100'
-											}`}
-										>
-											<div className="flex flex-col gap-1 min-w-0">
-												<span className={`font-code-otp text-code-otp leading-tight select-text ${idx === 0 ? 'text-primary' : 'text-on-surface-variant'}`}>{candidate.code}</span>
-												<div className="flex items-center gap-1.5 min-w-0 max-w-[170px]">
-													<span className="font-body-sm text-outline text-[11px] truncate">{candidate.source.sender}</span>
-													{candidate.source.folder && <span className="px-1 py-[1px] bg-surface-container-highest text-[9px] text-outline rounded uppercase tracking-wider shrink-0">{candidate.source.folder}</span>}
-												</div>
-												<span className="font-body-sm text-outline/60 text-[9px] truncate max-w-[170px]">{formatTimestamp(candidate.source.receivedAt)}</span>
-											</div>
-											<button
-												type="button"
-												title={copiedCandidateLabel(candidate)}
-												aria-label={copiedCandidateLabel(candidate)}
-												className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer p-1.5 rounded hover:bg-surface-container-highest shrink-0"
-												onClick={() => void copyCandidate(candidate)}
-											>
-												<span className="material-symbols-outlined text-[18px]">
-													{copiedCode === candidate.code ? 'check' : 'content_copy'}
-												</span>
-											</button>
+						<div className="space-y-1.5 overflow-y-auto pr-1 flex-1 min-h-0">
+							{candidates.map((candidate, idx) => (
+								<div
+									key={`${candidate.source.messageId}-${candidate.code}-${idx}`}
+									className={`rounded p-3 flex items-center justify-between transition-all group cursor-pointer ${
+										idx === 0 ? 'warp-block-active' : 'warp-block opacity-80 hover:opacity-100'
+									}`}
+								>
+									<div className="flex flex-col gap-1 min-w-0">
+										<span className={`font-code-otp text-code-otp leading-tight select-text ${idx === 0 ? 'text-primary' : 'text-on-surface-variant'}`}>{candidate.code}</span>
+										<div className="flex items-center gap-1.5 min-w-0 max-w-[170px]">
+											<span className="font-body-sm text-outline text-[11px] truncate">{candidate.source.sender}</span>
+											{candidate.source.folder && <span className="px-1 py-[1px] bg-surface-container-highest text-[9px] text-outline rounded uppercase tracking-wider shrink-0">{candidate.source.folder}</span>}
 										</div>
-									))}
-									{candidates.length === 0 && (
-										<p className="font-body-sm text-outline text-center py-6 select-none bg-surface-container/10 border border-outline-variant/10 rounded">Candidates will appear here after scanning.</p>
-									)}
-								</div>
-							</div>
-
-							{/* Scan Trigger Button */}
-							{target && (
-								<div className="mt-4 shrink-0">
+										<span className="font-body-sm text-outline/60 text-[9px] truncate max-w-[170px]">{formatTimestamp(candidate.source.receivedAt)}</span>
+									</div>
 									<button
 										type="button"
-										disabled={scanState === 'scanning'}
-										className="w-full h-10 bg-surface-container-high border border-outline/20 text-on-surface font-body-sm rounded flex items-center justify-center gap-2 hover:bg-surface-bright transition-all cursor-pointer disabled:opacity-50"
-										onClick={() => void runScan(target, { force: true })}
+										title={copiedCandidateLabel(candidate)}
+										aria-label={copiedCandidateLabel(candidate)}
+										className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer p-1.5 rounded hover:bg-surface-container-highest shrink-0"
+										onClick={() => void copyCandidate(candidate)}
 									>
-										<span className="material-symbols-outlined text-[16px]">sync</span>
-										Scan Again
+										<span className="material-symbols-outlined text-[18px]">
+											{copiedCode === candidate.code ? 'check' : 'content_copy'}
+										</span>
 									</button>
 								</div>
+							))}
+							{candidates.length === 0 && (
+								<p className="font-body-sm text-outline text-center py-6 select-none bg-surface-container/10 border border-outline-variant/10 rounded">Candidates will appear here after scanning.</p>
 							)}
-						</>
-					) : (
-						<div className="flex-1 flex flex-col mt-4 min-h-0">
-							<div className="flex items-center justify-between mb-2 shrink-0 border-b border-surface-container-highest pb-2">
-								<span className="text-[12px] font-label-md text-on-surface">Recent 5 Emails Parsed</span>
-								<button type="button" onClick={() => setShowRecent(false)} className="text-[10px] text-primary hover:underline cursor-pointer select-none">
-									Back
-								</button>
-							</div>
-							<div className="space-y-2 overflow-y-auto pr-1 flex-1 min-h-0">
-								{recentMessages.length === 0 ? (
-									<p className="font-body-sm text-outline text-center py-6">No recent emails parsed.</p>
-								) : recentMessages.map((msg) => (
-									<div key={msg.id} className="warp-block rounded p-3 flex flex-col gap-1 transition-all">
-										<div 
-											className="flex flex-col gap-1 cursor-pointer group"
-											onClick={() => setExpandedMsgId(expandedMsgId === msg.id ? null : msg.id)}
-										>
-											<span className="font-body-sm text-primary text-[11px] truncate w-full group-hover:underline">{msg.from.name || msg.from.email}</span>
-											<span className="font-body-sm text-on-surface-variant text-[11px] truncate w-full">{msg.subject}</span>
-											<span className="font-body-sm text-outline text-[9px]">{formatTimestamp(msg.date ?? '')}</span>
-										</div>
-										{expandedMsgId === msg.id && (
-											<div className="mt-2 pt-2 border-t border-surface-container-highest text-[10px] text-outline font-body-sm whitespace-pre-wrap break-words max-h-[150px] overflow-y-auto">
-												{msg.bodyText || msg.snippet || 'No text content available.'}
-											</div>
-										)}
-									</div>
-								))}
-							</div>
+						</div>
+					</div>
+
+					{/* Scan Trigger Button */}
+					{target && (
+						<div className="mt-4 shrink-0">
+							<button
+								type="button"
+								disabled={scanState === 'scanning'}
+								className="w-full h-10 bg-surface-container-high border border-outline/20 text-on-surface font-body-sm rounded flex items-center justify-center gap-2 hover:bg-surface-bright transition-all cursor-pointer disabled:opacity-50"
+								onClick={() => void runScan(target, { force: true })}
+							>
+								<span className="material-symbols-outlined text-[16px]">sync</span>
+								Scan Again
+							</button>
 						</div>
 					)}
 				</main>

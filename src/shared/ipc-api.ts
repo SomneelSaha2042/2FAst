@@ -173,6 +173,7 @@ export interface IpcApi {
 	'window:hide': () => Promise<IpcResult<void>>
 	'window:minimize': () => Promise<IpcResult<void>>
 	'window:openSettings': () => Promise<IpcResult<void>>
+	'window:openRecentEmails': () => Promise<IpcResult<void>>
 }
 
 export const IPC_CHANNELS = [
@@ -209,4 +210,5 @@ export const IPC_CHANNELS = [
 	'window:hide',
 	'window:minimize',
 	'window:openSettings',
+	'window:openRecentEmails',
 ] as const satisfies readonly (keyof IpcApi)[]

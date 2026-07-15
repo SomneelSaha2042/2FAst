@@ -2,7 +2,7 @@ import { app, BrowserWindow, Menu } from 'electron'
 import Store from 'electron-store'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { setOtpPollService, setOnOpenSettings } from './ipc/index.js'
+import { setOtpPollService, setOnOpenSettings, setOnOpenRecentEmails } from './ipc/index.js'
 import { loadGoogleOAuthConfig } from './oauth/google-config.js'
 import { OtpPollService } from './otp/poll-service.js'
 import { TrayController } from './tray.js'
@@ -38,6 +38,7 @@ const windowStoreApi = windowStore as unknown as StoreApi<WindowStoreShape>
 
 let settingsWindow: BrowserWindow | null = null
 let pollWindow: BrowserWindow | null = null
+let recentEmailsWindow: BrowserWindow | null = null
 let tray: TrayController | null = null
 let isQuitting = false
 
@@ -78,7 +79,7 @@ const appIconPath = (): string => join(assetsPath(), '2FAst.png')
 
 const loadRendererView = async (
 	window: BrowserWindow,
-	view: 'settings' | 'poll',
+	view: 'settings' | 'poll' | 'recent-emails',
 	payload?: PollStartPayload
 ): Promise<void> => {
 	const devServerUrl = process.env.VITE_DEV_SERVER_URL || (!app.isPackaged ? 'http://localhost:5173' : undefined)
@@ -178,6 +179,39 @@ const createPollWindow = (): BrowserWindow => {
 	return window
 }
 
+const createRecentEmailsWindow = (): BrowserWindow => {
+	const window = new BrowserWindow({
+		width: 600,
+		height: 800,
+		minWidth: 400,
+		minHeight: 500,
+		show: false,
+		frame: false,
+		transparent: true,
+		backgroundColor: '#00000000',
+		titleBarStyle: 'hidden',
+		icon: appIconPath(),
+		webPreferences: {
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: true,
+			preload: join(currentDir, '../preload/index.cjs'),
+		},
+	})
+	window.on('close', (event) => {
+		if (!isQuitting) {
+			event.preventDefault()
+			window.hide()
+		}
+	})
+	window.on('closed', () => {
+		if (recentEmailsWindow === window) {
+			recentEmailsWindow = null
+		}
+	})
+	return window
+}
+
 const openSettingsWindow = (): void => {
 	if (!settingsWindow) {
 		settingsWindow = createSettingsWindow()
@@ -233,6 +267,16 @@ app.whenReady().then(() => {
 	void loadRendererView(settingsWindow, 'settings')
 
 	setOnOpenSettings(openSettingsWindow)
+	
+	const openRecentEmailsWindow = (): void => {
+		if (!recentEmailsWindow) {
+			recentEmailsWindow = createRecentEmailsWindow()
+			void loadRendererView(recentEmailsWindow, 'recent-emails')
+		}
+		recentEmailsWindow.show()
+		recentEmailsWindow.focus()
+	}
+	setOnOpenRecentEmails(openRecentEmailsWindow)
 
 	const settings = getOtpSettings()
 	setAutoLaunch(settings.launchOnStartup)
