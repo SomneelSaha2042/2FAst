@@ -1,13 +1,9 @@
 import type {
 	Account,
-	Label,
-	MailFolder,
 	Message,
-	MessageAddress,
 	Provider,
 	ProviderDescriptor,
 	ImapSecurity,
-	Thread,
 } from './models'
 
 export interface IpcResult<T> {
@@ -16,21 +12,7 @@ export interface IpcResult<T> {
 	error?: string
 }
 
-export interface File {
-	readonly name: string
-	readonly size: number
-	readonly type: string
-}
 
-export interface DraftMessage {
-	to: MessageAddress[]
-	cc?: MessageAddress[]
-	bcc?: MessageAddress[]
-	subject: string
-	bodyHtml?: string
-	bodyText?: string
-	attachments?: File[]
-}
 
 export interface GoogleOAuthConfigInput {
 	readonly gmailEmail: string
@@ -126,39 +108,7 @@ export interface IpcApi {
 	'accounts:add': (request: AccountAddRequest) => Promise<IpcResult<Account>>
 	'accounts:reconnect': (accountId: string, request?: ImapReconnectRequest) => Promise<IpcResult<Account>>
 	'accounts:remove': (accountId: string) => Promise<IpcResult<void>>
-	'mail:listMessages': (
-		accountId: string,
-		options?: {
-			labelId?: string
-			folderId?: string
-			query?: string
-			searchText?: string
-			receivedAfter?: string
-			pageToken?: string
-			maxResults?: number
-		}
-	) => Promise<IpcResult<{ messages: Message[]; nextPageToken?: string }>>
-	'mail:getMessage': (accountId: string, messageId: string) => Promise<IpcResult<Message>>
-	'mail:getThread': (accountId: string, threadId: string) => Promise<IpcResult<Thread>>
-	'mail:listLabels': (accountId: string) => Promise<IpcResult<Label[]>>
-	'mail:listFolders': (accountId: string) => Promise<IpcResult<MailFolder[]>>
-	'mail:sendMessage': (accountId: string, draft: DraftMessage) => Promise<IpcResult<Message>>
-	'mail:replyToMessage': (
-		accountId: string,
-		messageId: string,
-		body: string
-	) => Promise<IpcResult<Message>>
-	'mail:trashMessage': (accountId: string, messageId: string) => Promise<IpcResult<void>>
-	'mail:toggleRead': (
-		accountId: string,
-		messageId: string,
-		isRead: boolean
-	) => Promise<IpcResult<void>>
-	'mail:toggleStar': (
-		accountId: string,
-		messageId: string,
-		isStarred: boolean
-	) => Promise<IpcResult<void>>
+
 	'otp:copy': (otpId: string) => Promise<IpcResult<{ code: string | null }>>
 	'otp:getHistory': () => Promise<IpcResult<StoredOtp[]>>
 	'otp:clearHistory': () => Promise<IpcResult<void>>
@@ -186,16 +136,6 @@ export const IPC_CHANNELS = [
 	'accounts:add',
 	'accounts:reconnect',
 	'accounts:remove',
-	'mail:listMessages',
-	'mail:getMessage',
-	'mail:getThread',
-	'mail:listLabels',
-	'mail:listFolders',
-	'mail:sendMessage',
-	'mail:replyToMessage',
-	'mail:trashMessage',
-	'mail:toggleRead',
-	'mail:toggleStar',
 	'otp:copy',
 	'otp:getHistory',
 	'otp:clearHistory',

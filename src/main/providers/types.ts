@@ -1,5 +1,4 @@
-import type { DraftMessage } from '../../shared/ipc-api.js'
-import type { Label, MailFolder, Message, Provider, Thread } from '../../shared/models.js'
+import type { MailFolder, Message, Provider } from '../../shared/models.js'
 
 export interface ListMessagesOptions {
 	readonly labelId?: string
@@ -20,12 +19,6 @@ export interface MailProvider {
 	readonly provider: Provider
 	listMessages(options?: ListMessagesOptions): Promise<ListMessagesResult>
 	getMessage(messageId: string): Promise<Message>
-	getThread?(threadId: string): Promise<Thread>
-	listLabels(): Promise<Label[]>
 	listFolders(): Promise<MailFolder[]>
-	sendMessage?(draft: DraftMessage): Promise<Message>
-	trashMessage?(messageId: string): Promise<void>
-	toggleRead?(messageId: string, isRead: boolean): Promise<void>
-	toggleStar?(messageId: string, isStarred: boolean): Promise<void>
 	dispose?(): Promise<void>
 }

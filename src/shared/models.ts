@@ -70,26 +70,7 @@ export interface Message {
 	readonly attachments: readonly Attachment[]
 }
 
-export interface Thread {
-	readonly id: string
-	readonly accountId: string
-	readonly subject: string
-	readonly snippet: string
-	readonly lastMessageDate: string
-	readonly messageCount: number
-	readonly messages: readonly Message[]
-	readonly labelIds: readonly string[]
-	readonly isRead: boolean
-}
 
-export interface Label {
-	readonly id: string
-	readonly accountId: string
-	readonly name: string
-	readonly type: 'system' | 'user'
-	readonly messageCount?: number
-	readonly unreadCount?: number
-}
 
 export interface MailFolder {
 	readonly id: string

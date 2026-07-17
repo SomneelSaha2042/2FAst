@@ -1,7 +1,6 @@
 import { google } from 'googleapis'
 import type { gmail_v1 } from 'googleapis'
-import type { DraftMessage } from '../../shared/ipc-api.js'
-import type { Attachment, Label, MailFolder, Message, MessageAddress, Thread } from '../../shared/models.js'
+import type { Attachment, MailFolder, Message, MessageAddress } from '../../shared/models.js'
 import type { OAuthConfig } from '../oauth/oauth-handler.js'
 import { ensureValidAccessToken } from '../oauth/token-refresh.js'
 import { loadTokens } from '../accounts/token-store.js'
@@ -9,7 +8,6 @@ import type { ListMessagesOptions, ListMessagesResult, MailProvider } from './ty
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const DEFAULT_MAX_RESULTS = 50
-const IMPORTANT_LABELS = new Set(['INBOX', 'SENT', 'DRAFT', 'DRAFTS', 'SPAM', 'TRASH'])
 const METADATA_HEADERS = ['Subject', 'From', 'To', 'Cc', 'Date']
 
 interface ParsedBodies {
@@ -220,72 +218,6 @@ export class GmailProvider implements MailProvider {
 	}
 
 	/**
-	 * Fetches a Gmail thread and maps all thread messages.
-	 * @param threadId Provider thread identifier.
-	 * @returns Mapped thread object with nested message collection.
-	 */
-	async getThread(threadId: string): Promise<Thread> {
-		const gmail = await this.getClient()
-		const response = await gmail.users.threads.get({
-			userId: 'me',
-			id: threadId,
-			format: 'full',
-		})
-		const messages = (response.data.messages ?? []).map((item: gmail_v1.Schema$Message) =>
-			mapGmailMessage(this.accountId, item, true)
-		)
-		const last = messages[messages.length - 1]
-		return {
-			id: response.data.id ?? threadId,
-			accountId: this.accountId,
-			subject: messages[0]?.subject ?? '(No subject)',
-			snippet: last?.snippet ?? '',
-			lastMessageDate: last?.date ?? new Date(0).toISOString(),
-			messageCount: messages.length,
-			messages,
-			labelIds: last?.labelIds ?? [],
-			isRead: messages.every((message: Message) => message.isRead),
-		}
-	}
-
-	/**
-	 * Lists Gmail labels for the account.
-	 * @returns Label collection with mapped type and count fields.
-	 */
-	async listLabels(): Promise<Label[]> {
-		const gmail = await this.getClient()
-		const response = await gmail.users.labels.list({ userId: 'me' })
-		const labels = response.data.labels ?? []
-		const detailed = await Promise.all(
-			labels.map(async (label: gmail_v1.Schema$Label) => {
-				if (!label.id || !IMPORTANT_LABELS.has(label.id)) {
-					return label
-				}
-				const details = await gmail.users.labels.get({
-					userId: 'me',
-					id: label.id,
-				})
-				return {
-					...label,
-					...details.data,
-				}
-			})
-		)
-		return detailed
-			.filter((label: gmail_v1.Schema$Label): label is gmail_v1.Schema$Label & { id: string; name: string } =>
-				Boolean(label.id && label.name)
-			)
-			.map((label: gmail_v1.Schema$Label & { id: string; name: string }) => ({
-				id: label.id,
-				accountId: this.accountId,
-				name: label.name,
-				type: label.type === 'system' ? 'system' : 'user',
-				messageCount: label.messagesTotal ?? undefined,
-				unreadCount: label.messagesUnread ?? undefined,
-			}))
-	}
-
-	/**
 	 * Lists folders for providers that support folder APIs.
 	 * @returns Empty collection because Gmail uses labels in this phase.
 	 */
@@ -293,58 +225,7 @@ export class GmailProvider implements MailProvider {
 		return []
 	}
 
-	/**
-	 * Sends a message draft for this provider.
-	 * @param _draft Draft payload.
-	 * @returns A promise that rejects because send is not implemented in Phase 4.
-	 */
-	async sendMessage(_draft: DraftMessage): Promise<Message> {
-		void _draft
-		throw new Error('Gmail sendMessage is not implemented in Phase 4')
-	}
 
-	/**
-	 * Moves a message to trash.
-	 * @param messageId Provider message identifier.
-	 * @returns Promise that resolves when the API call completes.
-	 */
-	async trashMessage(messageId: string): Promise<void> {
-		const gmail = await this.getClient()
-		await gmail.users.messages.trash({
-			userId: 'me',
-			id: messageId,
-		})
-	}
-
-	/**
-	 * Adds or removes unread status from a message.
-	 * @param messageId Provider message identifier.
-	 * @param isRead Target read state.
-	 * @returns Promise that resolves when modify request completes.
-	 */
-	async toggleRead(messageId: string, isRead: boolean): Promise<void> {
-		const gmail = await this.getClient()
-		await gmail.users.messages.modify({
-			userId: 'me',
-			id: messageId,
-			requestBody: isRead ? { removeLabelIds: ['UNREAD'] } : { addLabelIds: ['UNREAD'] },
-		})
-	}
-
-	/**
-	 * Adds or removes starred status from a message.
-	 * @param messageId Provider message identifier.
-	 * @param isStarred Target starred state.
-	 * @returns Promise that resolves when modify request completes.
-	 */
-	async toggleStar(messageId: string, isStarred: boolean): Promise<void> {
-		const gmail = await this.getClient()
-		await gmail.users.messages.modify({
-			userId: 'me',
-			id: messageId,
-			requestBody: isStarred ? { addLabelIds: ['STARRED'] } : { removeLabelIds: ['STARRED'] },
-		})
-	}
 
 	private async getClient(): Promise<gmail_v1.Gmail> {
 		const tokens = await loadTokens(this.accountId)

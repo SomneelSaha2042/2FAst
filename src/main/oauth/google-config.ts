@@ -1,4 +1,4 @@
-import { dialog } from 'electron'
+
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -16,7 +16,7 @@ interface GoogleOAuthConfigStore {
 }
 
 const GOOGLE_CONFIG_PATH = join(homedir(), '.2fast', 'google-oauth.json')
-const BYOC_SETUP_GUIDE_URL = 'https://developers.google.com/identity/protocols/oauth2/native-app'
+
 const GOOGLE_CONFIG_DIR = join(homedir(), '.2fast')
 
 const isNonEmptyString = (value: unknown): value is string =>
@@ -46,16 +46,7 @@ const isValidGoogleOAuthConfigStore = (value: unknown): value is GoogleOAuthConf
 	)
 }
 
-const showMissingConfigDialog = async (): Promise<void> => {
-	await dialog.showMessageBox({
-		type: 'warning',
-		buttons: ['OK'],
-		defaultId: 0,
-		title: 'Google OAuth Setup Required',
-		message: 'Missing Google OAuth configuration.',
-		detail: `Create ${GOOGLE_CONFIG_PATH} with your BYOC client_id and client_secret.\nGuide: ${BYOC_SETUP_GUIDE_URL}`,
-	})
-}
+
 
 const parseAndValidateConfigStore = (rawJson: string): GoogleOAuthConfigStore => {
 	let parsed: unknown
@@ -113,22 +104,7 @@ export const loadGoogleOAuthConfigByClientId = async (clientId: string): Promise
 	return store.clients.find((client) => client.client_id === clientId) ?? null
 }
 
-/**
- * Returns whether a valid Google OAuth config is currently available.
- * @returns True when a valid BYOC config file exists.
- */
-export const hasValidGoogleOAuthConfig = (): boolean => {
-	if (!existsSync(GOOGLE_CONFIG_PATH)) {
-		return false
-	}
 
-	try {
-		parseAndValidateConfig(readFileSync(GOOGLE_CONFIG_PATH, 'utf8'))
-		return true
-	} catch {
-		return false
-	}
-}
 
 /**
  * Persists and validates Google OAuth BYOC config at ~/.2fast/google-oauth.json.
@@ -173,10 +149,4 @@ export const deleteGoogleOAuthConfig = async (): Promise<boolean> => {
 	return true
 }
 
-/**
- * Displays a BYOC setup reminder dialog for desktop users.
- * @returns Promise that resolves after user dismisses the message box.
- */
-export const showGoogleByocSetupDialog = async (): Promise<void> => {
-	await showMissingConfigDialog()
-}
+

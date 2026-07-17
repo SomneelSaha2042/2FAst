@@ -1,6 +1,6 @@
 import { ImapFlow, type FetchMessageObject, type ImapFlowOptions, type MessageAddressObject, type SearchObject } from 'imapflow'
 import { Readable } from 'node:stream'
-import type { Attachment, Label, MailFolder, Message, MessageAddress, Provider } from '../../shared/models.js'
+import type { Attachment, MailFolder, Message, MessageAddress, Provider } from '../../shared/models.js'
 import type { ImapCredentials } from '../accounts/imap-credential-store.js'
 import type { ListMessagesOptions, ListMessagesResult, MailProvider } from './types.js'
 
@@ -329,14 +329,6 @@ export class ImapProvider implements MailProvider {
 					type,
 				}
 			})
-	}
-
-	/**
-	 * Returns no labels because IMAP uses folders.
-	 * @returns Empty label collection.
-	 */
-	async listLabels(): Promise<Label[]> {
-		return []
 	}
 
 	/**

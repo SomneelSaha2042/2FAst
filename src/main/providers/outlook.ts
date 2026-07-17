@@ -1,6 +1,5 @@
 import { Client } from '@microsoft/microsoft-graph-client'
-import type { DraftMessage } from '../../shared/ipc-api.js'
-import type { Label, MailFolder, Message, MessageAddress, Thread } from '../../shared/models.js'
+import type { MailFolder, Message, MessageAddress } from '../../shared/models.js'
 import type { ListMessagesOptions, ListMessagesResult, MailProvider } from './types.js'
 import { acquireMicrosoftAccessToken } from '../oauth/microsoft-auth.js'
 
@@ -156,41 +155,6 @@ export class OutlookProvider implements MailProvider {
 		const response = (await this.getClient().api(`/me/messages/${messageId}`).get()) as GraphMessage
 		return mapMessage(this.accountId, response, true)
 	}
-
-	/**
-	 * Fetches all messages in a Graph conversation and maps to thread shape.
-	 * @param threadId Outlook conversation id.
-	 * @returns Thread representation with ordered messages.
-	 */
-	async getThread(threadId: string): Promise<Thread> {
-		const response = (await this.getClient()
-			.api('/me/messages')
-			.filter(`conversationId eq '${threadId}'`)
-			.orderby('receivedDateTime asc')
-			.get()) as GraphMessageListResponse
-		const messages = (response.value ?? []).map((message) => mapMessage(this.accountId, message, true))
-		const last = messages[messages.length - 1]
-		return {
-			id: threadId,
-			accountId: this.accountId,
-			subject: messages[0]?.subject ?? '(No subject)',
-			snippet: last?.snippet ?? '',
-			lastMessageDate: last?.date ?? new Date(0).toISOString(),
-			messageCount: messages.length,
-			messages,
-			labelIds: [],
-			isRead: messages.every((message) => message.isRead),
-		}
-	}
-
-	/**
-	 * Outlook uses folders and not Gmail-style labels.
-	 * @returns Empty label list.
-	 */
-	async listLabels(): Promise<Label[]> {
-		return []
-	}
-
 	/**
 	 * Lists Outlook mail folders.
 	 * @returns Mapped folder collection.
@@ -209,50 +173,6 @@ export class OutlookProvider implements MailProvider {
 				totalItemCount: folder.totalItemCount,
 				unreadItemCount: folder.unreadItemCount,
 			}))
-	}
-
-	/**
-	 * Sends a message draft for this provider.
-	 * @param _draft Draft payload.
-	 * @returns A promise that rejects because send is not implemented in this phase.
-	 */
-	async sendMessage(_draft: DraftMessage): Promise<Message> {
-		void _draft
-		throw new Error('Outlook sendMessage is not implemented in Phase 5')
-	}
-
-	/**
-	 * Trashes a message for this provider.
-	 * @param _messageId Provider message identifier.
-	 * @returns A promise that rejects because trash is not implemented in this phase.
-	 */
-	async trashMessage(_messageId: string): Promise<void> {
-		void _messageId
-		throw new Error('Outlook trashMessage is not implemented in Phase 5')
-	}
-
-	/**
-	 * Toggles read status for this provider.
-	 * @param _messageId Provider message identifier.
-	 * @param _isRead Desired read state.
-	 * @returns A promise that rejects because toggle is not implemented in this phase.
-	 */
-	async toggleRead(_messageId: string, _isRead: boolean): Promise<void> {
-		void _messageId
-		void _isRead
-		throw new Error('Outlook toggleRead is not implemented in Phase 5')
-	}
-
-	/**
-	 * Toggles starred status for this provider.
-	 * @param _messageId Provider message identifier.
-	 * @param _isStarred Desired star state.
-	 * @returns A promise that rejects because toggle is not implemented in this phase.
-	 */
-	async toggleStar(_messageId: string, _isStarred: boolean): Promise<void> {
-		void _messageId
-		void _isStarred
-		throw new Error('Outlook toggleStar is not implemented in Phase 5')
 	}
 
 	private getClient(): Client {

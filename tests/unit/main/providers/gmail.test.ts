@@ -151,44 +151,4 @@ describe('gmail provider', () => {
 		expect(message.bodyHtml).toBe('<p>Hello</p>')
 	})
 
-	it('maps labels with counts and type', async () => {
-		labelsListMock.mockResolvedValue({
-			data: {
-				labels: [
-					{ id: 'INBOX', name: 'INBOX', type: 'system' },
-					{ id: 'Label_1', name: 'Receipts', type: 'user' },
-				],
-			},
-		})
-		labelsGetMock.mockResolvedValue({
-			data: {
-				id: 'INBOX',
-				name: 'INBOX',
-				type: 'system',
-				messagesTotal: 10,
-				messagesUnread: 3,
-			},
-		})
-
-		const { GmailProvider } = await import('../../../../src/main/providers/gmail')
-		const provider = new GmailProvider('account-1', 'client-id', 'client-secret')
-		const labels = await provider.listLabels()
-
-		expect(labels).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({
-					id: 'INBOX',
-					accountId: 'account-1',
-					type: 'system',
-					messageCount: 10,
-					unreadCount: 3,
-				}),
-				expect.objectContaining({
-					id: 'Label_1',
-					name: 'Receipts',
-					type: 'user',
-				}),
-			])
-		)
-	})
 })
