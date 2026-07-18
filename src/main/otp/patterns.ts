@@ -290,12 +290,14 @@ export function extractOtp(subject: string, bodyText: string, bodyHtml: string):
 		return urlMatch
 	}
 
-	const explicit = findExplicitMatch(extractionText)
+	const textWithoutUrls = extractionText.replace(URL_PATTERN, ' ')
+
+	const explicit = findExplicitMatch(textWithoutUrls)
 	if (explicit) {
 		return explicit
 	}
 
-	const contextual = findContextualCode(extractionText, strongContext)
+	const contextual = findContextualCode(textWithoutUrls, strongContext)
 	if (contextual) {
 		return contextual
 	}
