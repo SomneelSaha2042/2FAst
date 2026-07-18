@@ -181,9 +181,9 @@ const createPollWindow = (): BrowserWindow => {
 
 const createRecentEmailsWindow = (): BrowserWindow => {
 	const window = new BrowserWindow({
-		width: 600,
+		width: 800,
 		height: 800,
-		minWidth: 400,
+		minWidth: 600,
 		minHeight: 500,
 		show: false,
 		frame: false,

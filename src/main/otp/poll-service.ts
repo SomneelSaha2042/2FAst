@@ -179,9 +179,11 @@ export class OtpPollService {
 	}
 
 	private addRecentParsedMessage(message: Message): void {
-		this.recentParsedMessages.unshift(message)
+		this.recentParsedMessages = this.recentParsedMessages.filter((m) => m.id !== message.id)
+		this.recentParsedMessages.push(message)
+		this.recentParsedMessages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 		if (this.recentParsedMessages.length > 5) {
-			this.recentParsedMessages.pop()
+			this.recentParsedMessages = this.recentParsedMessages.slice(0, 5)
 		}
 	}
 
@@ -304,6 +306,11 @@ export class OtpPollService {
 				if (item.labelIds.length > 0 && message.labelIds.length === 0) {
 					message = { ...message, labelIds: item.labelIds }
 				}
+				const isSent = message.labelIds.includes('SENT') || message.from.email.toLowerCase() === account.email.toLowerCase()
+				if (isSent) {
+					await this.writePollLog(`[${new Date().toISOString()}] scan:skip-sent accountId=${account.id} messageId=${message.id}`)
+					continue
+				}
 				this.addRecentParsedMessage(message)
 				const extracted = extractOtp(message.subject, message.bodyText ?? '', message.bodyHtml ?? '')
 				if (!extracted) {
@@ -358,6 +365,12 @@ export class OtpPollService {
 			await this.writePollLog(
 				`[${new Date().toISOString()}] poll:get accountId=${account.id} messageId=${message.id} receivedAt=${message.date} from=${message.from.email} subjectLength=${message.subject.length}`
 			)
+
+			const isSent = message.labelIds.includes('SENT') || message.from.email.toLowerCase() === account.email.toLowerCase()
+			if (isSent) {
+				await this.writePollLog(`[${new Date().toISOString()}] poll:skip-sent accountId=${account.id} messageId=${message.id}`)
+				continue
+			}
 
 			this.addRecentParsedMessage(message)
 

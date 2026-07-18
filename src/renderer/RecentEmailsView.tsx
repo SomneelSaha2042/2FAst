@@ -1,6 +1,6 @@
 import React, { ReactElement, useEffect, useState } from 'react'
 import type { Message } from '../shared/models'
-import { getApi, formatTimestamp, WindowChrome } from './shared'
+import { getApi, WindowChrome } from './shared'
 
 export default function RecentEmailsView(): ReactElement {
 	const [recentMessages, setRecentMessages] = useState<Message[]>([])
@@ -75,16 +75,29 @@ export default function RecentEmailsView(): ReactElement {
 										onClick={() => setExpandedMsgId(expandedMsgId === msg.id ? null : msg.id)}
 									>
 										<div className="flex justify-between items-start gap-4">
-											<span className="font-body-md font-medium text-primary truncate flex-1 group-hover:underline">
-												{msg.from.name || msg.from.email}
-											</span>
-											<span className="font-body-sm text-outline text-[11px] shrink-0">
-												{formatTimestamp(msg.date ?? '')}
-											</span>
+											<div className="flex flex-col flex-1 min-w-0">
+												<span className="font-body-md font-medium text-primary truncate group-hover:underline">
+													{msg.from.name || msg.from.email}
+												</span>
+												<span className="font-body-sm text-on-surface-variant text-[13px] break-words line-clamp-2">
+													{msg.subject || '(No Subject)'}
+												</span>
+											</div>
+											<div className="flex flex-col items-end shrink-0 gap-1">
+												<span className="font-body-sm text-outline text-[11px]">
+													{msg.date ? new Date(msg.date).toLocaleString() : ''}
+												</span>
+												{msg.labelIds && msg.labelIds.length > 0 && (
+													<div className="flex flex-wrap gap-1 justify-end max-w-[120px]">
+														{msg.labelIds.filter(l => !['UNREAD', 'STARRED'].includes(l)).slice(0, 2).map((label, i) => (
+															<span key={i} className="text-[9px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded truncate max-w-full">
+																{label.replace('CATEGORY_', '')}
+															</span>
+														))}
+													</div>
+												)}
+											</div>
 										</div>
-										<span className="font-body-sm text-on-surface-variant text-[13px] break-words line-clamp-2">
-											{msg.subject || '(No Subject)'}
-										</span>
 									</div>
 									
 									{expandedMsgId === msg.id && (
