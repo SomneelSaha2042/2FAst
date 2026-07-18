@@ -24,7 +24,11 @@ const GOOGLE_SCOPES = ['https://www.googleapis.com/auth/gmail.modify', 'https://
 const defaultStore: AccountStoreShape = { accounts: [] }
 
 export class AccountManager {
-	private readonly store = new Store<AccountStoreShape>({ name: 'accounts', defaults: defaultStore })
+	private _store: Store<AccountStoreShape> | null = null
+	private get store(): Store<AccountStoreShape> {
+		if (!this._store) this._store = new Store<AccountStoreShape>({ name: 'accounts', defaults: defaultStore })
+		return this._store
+	}
 	private googleConfig: GoogleOAuthConfig | null = null
 	private readonly connectors = new Map<Provider, AccountConnector>()
 	private readonly providerCache = new Map<string, MailProvider>()

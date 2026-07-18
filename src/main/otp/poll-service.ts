@@ -45,7 +45,8 @@ export class OtpPollService {
 	private config: PollServiceConfig
 	private readonly seenIds: Set<string>
 	private seenIdsDirty = false
-	private readonly folderCache = new Map<string, string[]>()
+	private readonly folderCache = new Map<string, { folders: string[]; cachedAt: number }>()
+	private static readonly FOLDER_CACHE_TTL_MS = 3_600_000 // 1 hour
 	private readonly seenStore: Store<SeenStoreData>
 	private readonly seenStoreApi: StoreApi<SeenStoreData>
 	private readonly statusByAccountId = new Map<string, PollStatus>()
@@ -97,9 +98,9 @@ export class OtpPollService {
 		if (this.timer) {
 			return
 		}
-		void this.pollAllAccounts()
+		this.pollAllAccounts().catch((error) => console.error('Poll start error:', error))
 		this.timer = setInterval(() => {
-			void this.pollAllAccounts()
+			this.pollAllAccounts().catch((error) => console.error('Poll timer error:', error))
 		}, this.config.intervalMs)
 	}
 
@@ -140,7 +141,7 @@ export class OtpPollService {
 		if (this.timer) {
 			clearInterval(this.timer)
 			this.timer = setInterval(() => {
-				void this.pollAllAccounts()
+				this.pollAllAccounts().catch((error) => console.error('Poll timer error:', error))
 			}, this.config.intervalMs)
 		}
 	}
@@ -203,7 +204,12 @@ export class OtpPollService {
 		if (accounts.length > 0) {
 			this.onScanStarted()
 			try {
-				await Promise.all(accounts.map((account) => this.pollAccount(account)))
+				const results = await Promise.allSettled(accounts.map((account) => this.pollAccount(account)))
+				for (const result of results) {
+					if (result.status === 'rejected') {
+						console.error(`[POLL ERROR] Background poll failed:`, result.reason)
+					}
+				}
 			} finally {
 				this.onScanFinished()
 			}
@@ -246,11 +252,12 @@ export class OtpPollService {
 		if (account.provider === 'outlook') {
 			folders = ['inbox', 'junkemail', 'deleteditems']
 		} else if (account.provider !== 'gmail') {
-			let cached = this.folderCache.get(account.id)
+			const cacheEntry = this.folderCache.get(account.id)
+			let cached = cacheEntry && (Date.now() - cacheEntry.cachedAt < OtpPollService.FOLDER_CACHE_TTL_MS) ? cacheEntry.folders : undefined
 			if (!cached) {
 				const all = await provider.listFolders()
 				cached = all.filter((f) => f.type === 'inbox' || f.type === 'junk' || f.type === 'trash').map((f) => f.id)
-				this.folderCache.set(account.id, cached)
+				this.folderCache.set(account.id, { folders: cached, cachedAt: Date.now() })
 			}
 			folders = cached.length > 0 ? cached : undefined
 		}
@@ -408,7 +415,12 @@ export class OtpPollService {
 
 	private persistSeenIds(): void {
 		if (this.seenIdsDirty) {
-			this.seenStoreApi.set('seenMessageIds', Array.from(this.seenIds).slice(-1000))
+			const trimmed = Array.from(this.seenIds).slice(-1000)
+			this.seenStoreApi.set('seenMessageIds', trimmed)
+			if (this.seenIds.size > 1000) {
+				this.seenIds.clear()
+				for (const id of trimmed) this.seenIds.add(id)
+			}
 			this.seenIdsDirty = false
 		}
 	}

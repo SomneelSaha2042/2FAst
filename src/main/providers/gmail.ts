@@ -228,6 +228,9 @@ export class GmailProvider implements MailProvider {
 
 
 	private async getClient(): Promise<gmail_v1.Gmail> {
+		if (this.cachedClient && this.lastTokenRefresh > Date.now() + 60_000) {
+			return this.cachedClient
+		}
 		const tokens = await loadTokens(this.accountId)
 		if (!tokens) {
 			this.cachedClient = null

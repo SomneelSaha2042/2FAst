@@ -1,5 +1,5 @@
 import { safeStorage } from 'electron'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { OAuthTokens } from '../oauth/oauth-handler.js'
@@ -22,10 +22,10 @@ const ensureSafeStorageAvailable = (): void => {
  */
 export const saveTokens = async (accountId: string, tokens: OAuthTokens): Promise<void> => {
 	ensureSafeStorageAvailable()
-	mkdirSync(TOKENS_DIR, { recursive: true })
+	await mkdir(TOKENS_DIR, { recursive: true })
 	const serialized = JSON.stringify(tokens)
 	const encrypted = safeStorage.encryptString(serialized)
-	writeFileSync(tokenFilePath(accountId), encrypted)
+	await writeFile(tokenFilePath(accountId), encrypted)
 }
 
 /**
@@ -36,14 +36,14 @@ export const saveTokens = async (accountId: string, tokens: OAuthTokens): Promis
 export const loadTokens = async (accountId: string): Promise<OAuthTokens | null> => {
 	ensureSafeStorageAvailable()
 	const filePath = tokenFilePath(accountId)
-	if (!existsSync(filePath)) {
+	try {
+		const encrypted = await readFile(filePath)
+		const decrypted = safeStorage.decryptString(encrypted)
+		const parsed = JSON.parse(decrypted) as OAuthTokens
+		return parsed
+	} catch {
 		return null
 	}
-
-	const encrypted = readFileSync(filePath)
-	const decrypted = safeStorage.decryptString(encrypted)
-	const parsed = JSON.parse(decrypted) as OAuthTokens
-	return parsed
 }
 
 /**
@@ -53,8 +53,10 @@ export const loadTokens = async (accountId: string): Promise<OAuthTokens | null>
  */
 export const deleteTokens = async (accountId: string): Promise<void> => {
 	const filePath = tokenFilePath(accountId)
-	if (existsSync(filePath)) {
-		rmSync(filePath, { force: true })
+	try {
+		await rm(filePath, { force: true })
+	} catch {
+		// Ignore deletion errors
 	}
 }
 
@@ -66,9 +68,9 @@ export const deleteTokens = async (accountId: string): Promise<void> => {
  */
 export const saveTokenCacheByKey = async (accountId: string, cache: string): Promise<void> => {
 	ensureSafeStorageAvailable()
-	mkdirSync(TOKENS_DIR, { recursive: true })
+	await mkdir(TOKENS_DIR, { recursive: true })
 	const encrypted = safeStorage.encryptString(cache)
-	writeFileSync(tokenFilePath(accountId), encrypted)
+	await writeFile(tokenFilePath(accountId), encrypted)
 }
 
 /**
@@ -79,9 +81,10 @@ export const saveTokenCacheByKey = async (accountId: string, cache: string): Pro
 export const loadTokenCacheByKey = async (accountId: string): Promise<string | null> => {
 	ensureSafeStorageAvailable()
 	const filePath = tokenFilePath(accountId)
-	if (!existsSync(filePath)) {
+	try {
+		const encrypted = await readFile(filePath)
+		return safeStorage.decryptString(encrypted)
+	} catch {
 		return null
 	}
-	const encrypted = readFileSync(filePath)
-	return safeStorage.decryptString(encrypted)
 }

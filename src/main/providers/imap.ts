@@ -365,6 +365,7 @@ export class ImapProvider implements MailProvider {
 			return this.client
 		}
 		if (this.client) {
+			this.client.removeAllListeners()
 			try {
 				await this.client.logout()
 			} catch {
