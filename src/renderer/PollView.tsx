@@ -54,7 +54,11 @@ function PollView(): ReactElement {
 	useEffect(() => {
 		const startAutomaticScan = (payload: PollStartPayload): void => {
 			setTarget(payload)
-			void runScan(payload)
+			setCandidates([])
+			setScanState('idle')
+			setCopiedCode(null)
+			setError(null)
+			void runScan(payload, { force: true })
 		}
 		const initial = pollPayloadFromLocation()
 		if (initial) {
