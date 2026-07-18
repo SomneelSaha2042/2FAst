@@ -13,7 +13,10 @@ function PollView(): ReactElement {
 		options?: { readonly force?: boolean }
 	): Promise<void> => {
 		const key = pollPayloadKey(payload)
-		if (!options?.force && (automaticPollScans.activeKeys.has(key) || automaticPollScans.completedKeys.has(key))) {
+		if (automaticPollScans.activeKeys.has(key)) {
+			return
+		}
+		if (!options?.force && automaticPollScans.completedKeys.has(key)) {
 			return
 		}
 		const api = getApi()

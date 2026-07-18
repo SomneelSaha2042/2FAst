@@ -108,8 +108,10 @@ export class TrayController {
 	}
 
 	onScanStarted(): void {
+		if (this.scanCount === 0) {
+			this.tray.setImage(this.activeIcon)
+		}
 		this.scanCount++
-		this.tray.setImage(this.activeIcon)
 	}
 
 	onScanFinished(): void {
