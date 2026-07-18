@@ -97,6 +97,7 @@ const isIsoDate = (value: string): boolean => !Number.isNaN(Date.parse(value))
 
 export class OutlookProvider implements MailProvider {
 	readonly provider = 'outlook' as const
+	private cachedClient: Client | null = null
 
 	constructor(
 		private readonly accountId: string,
@@ -176,7 +177,8 @@ export class OutlookProvider implements MailProvider {
 	}
 
 	private getClient(): Client {
-		return Client.init({
+		if (this.cachedClient) return this.cachedClient
+		this.cachedClient = Client.init({
 			authProvider: async (done: (error: Error | null, accessToken: string | null) => void) => {
 				try {
 					const token = await acquireMicrosoftAccessToken(this.accountId, this.oauthAccountId)
@@ -186,5 +188,6 @@ export class OutlookProvider implements MailProvider {
 				}
 			},
 		})
+		return this.cachedClient
 	}
 }
