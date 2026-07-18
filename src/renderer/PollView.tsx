@@ -213,7 +213,7 @@ function PollView(): ReactElement {
 					{/* Candidates list */}
 					<div className="flex-1 flex flex-col gap-2 mt-4 min-h-0">
 						<div className="flex items-center justify-between mb-2 shrink-0">
-							<button type="button" onClick={() => void openRecentEmailsWindow()} className="text-[10px] text-primary hover:underline cursor-pointer select-none">
+							<button type="button" onClick={() => void openRecentEmailsWindow(target?.accountId)} className="text-[10px] text-primary hover:underline cursor-pointer select-none">
 								Missed an OTP? View recent emails
 							</button>
 							<span className="text-[11px] font-label-md select-none text-secondary/80">LIVE</span>

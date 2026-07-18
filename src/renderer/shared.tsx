@@ -37,10 +37,10 @@ export const viewFromLocation = (): AppView => {
 	return 'settings'
 }
 
-export const openRecentEmailsWindow = async (): Promise<void> => {
+export const openRecentEmailsWindow = async (accountId?: string): Promise<void> => {
 	const api = getApi()
 	if (api) {
-		await api['window:openRecentEmails']()
+		await api['window:openRecentEmails'](accountId)
 	}
 }
 

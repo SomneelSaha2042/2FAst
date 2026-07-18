@@ -52,7 +52,7 @@ export class OtpPollService {
 	private readonly statusByAccountId = new Map<string, PollStatus>()
 	private timer: NodeJS.Timeout | null = null
 	private paused = false
-	private recentParsedMessages: Message[] = []
+	private recentParsedMessages = new Map<string, Message[]>()
 	private readonly onOtpDetected: (otp: StoredOtp) => void
 	private readonly onOtpExpired: (otpId: string) => void
 	private readonly onPollStatus: (status: PollStatus) => void
@@ -175,17 +175,25 @@ export class OtpPollService {
 	 * Retrieves the last 5 parsed messages.
 	 * @returns The recent messages.
 	 */
-	getRecentParsedMessages(): Message[] {
-		return [...this.recentParsedMessages]
+	getRecentParsedMessages(accountId?: string): Message[] {
+		if (accountId) {
+			return this.recentParsedMessages.get(accountId) ?? []
+		}
+		const all = Array.from(this.recentParsedMessages.values()).flat()
+		all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+		return all.slice(0, 5)
 	}
 
 	private addRecentParsedMessage(message: Message): void {
-		this.recentParsedMessages = this.recentParsedMessages.filter((m) => m.id !== message.id)
-		this.recentParsedMessages.push(message)
-		this.recentParsedMessages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-		if (this.recentParsedMessages.length > 5) {
-			this.recentParsedMessages = this.recentParsedMessages.slice(0, 5)
+		const accountId = message.accountId
+		let list = this.recentParsedMessages.get(accountId) ?? []
+		list = list.filter((m) => m.id !== message.id)
+		list.push(message)
+		list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+		if (list.length > 5) {
+			list = list.slice(0, 5)
 		}
+		this.recentParsedMessages.set(accountId, list)
 	}
 
 	/**

@@ -275,13 +275,15 @@ app.whenReady().then(() => {
 
 	setOnOpenSettings(openSettingsWindow)
 	
-	const openRecentEmailsWindow = (): void => {
+	const openRecentEmailsWindow = (accountId?: string): void => {
 		if (!recentEmailsWindow) {
 			recentEmailsWindow = createRecentEmailsWindow()
-			void loadRendererView(recentEmailsWindow, 'recent-emails')
 		}
-		recentEmailsWindow.show()
-		recentEmailsWindow.focus()
+		const payload = accountId ? { accountId, email: '', provider: 'gmail' as const } : undefined
+		void loadRendererView(recentEmailsWindow, 'recent-emails', payload).then(() => {
+			recentEmailsWindow?.show()
+			recentEmailsWindow?.focus()
+		})
 	}
 	setOnOpenRecentEmails(openRecentEmailsWindow)
 

@@ -40,7 +40,7 @@ export const setOtpPollService = (service: OtpPollService): void => {
 }
 
 let onOpenSettingsCallback: (() => void) | null = null
-let onOpenRecentEmailsCallback: (() => void) | null = null
+let onOpenRecentEmailsCallback: ((accountId?: string) => void) | null = null
 
 /**
  * Injects the open settings window callback.
@@ -56,7 +56,7 @@ export const setOnOpenSettings = (callback: () => void): void => {
  * @param callback Callback function.
  * @returns Void.
  */
-export const setOnOpenRecentEmails = (callback: () => void): void => {
+export const setOnOpenRecentEmails = (callback: (accountId?: string) => void): void => {
 	onOpenRecentEmailsCallback = callback
 }
 
@@ -125,8 +125,8 @@ const registerIpcHandlers = (): void => {
 	ipcMain.handle('otp:clearHistory', async (): Promise<IpcResult<void>> => {
 		try { if (!otpPollService) throw new Error('OTP polling service is not initialized'); otpPollService.clearHistory(); return { success: true } } catch (error) { return formatError(error) }
 	})
-	ipcMain.handle('otp:getRecentParsedMessages', async (): Promise<IpcResult<unknown>> => {
-		try { if (!otpPollService) throw new Error('OTP polling service is not initialized'); return { success: true, data: otpPollService.getRecentParsedMessages() } } catch (error) { return formatError(error) }
+	ipcMain.handle('otp:getRecentParsedMessages', async (_event, accountId: unknown): Promise<IpcResult<unknown>> => {
+		try { if (!otpPollService) throw new Error('OTP polling service is not initialized'); return { success: true, data: otpPollService.getRecentParsedMessages(typeof accountId === 'string' ? accountId : undefined) } } catch (error) { return formatError(error) }
 	})
 
 	ipcMain.handle('poll:pause', async (): Promise<IpcResult<void>> => {
@@ -172,10 +172,10 @@ const registerIpcHandlers = (): void => {
 			return { success: true }
 		} catch (error) { return formatError(error) }
 	})
-	ipcMain.handle('window:openRecentEmails', async (): Promise<IpcResult<void>> => {
+	ipcMain.handle('window:openRecentEmails', async (_event, accountId: unknown): Promise<IpcResult<void>> => {
 		try {
 			if (onOpenRecentEmailsCallback) {
-				onOpenRecentEmailsCallback()
+				onOpenRecentEmailsCallback(typeof accountId === 'string' ? accountId : undefined)
 			}
 			return { success: true }
 		} catch (error) { return formatError(error) }

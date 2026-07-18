@@ -112,7 +112,7 @@ export interface IpcApi {
 	'otp:copy': (otpId: string) => Promise<IpcResult<{ code: string | null }>>
 	'otp:getHistory': () => Promise<IpcResult<StoredOtp[]>>
 	'otp:clearHistory': () => Promise<IpcResult<void>>
-	'otp:getRecentParsedMessages': () => Promise<IpcResult<Message[]>>
+	'otp:getRecentParsedMessages': (accountId?: string) => Promise<IpcResult<Message[]>>
 	'poll:pause': () => Promise<IpcResult<void>>
 	'poll:resume': () => Promise<IpcResult<void>>
 	'poll:setInterval': (ms: number) => Promise<IpcResult<void>>
@@ -123,7 +123,7 @@ export interface IpcApi {
 	'window:hide': () => Promise<IpcResult<void>>
 	'window:minimize': () => Promise<IpcResult<void>>
 	'window:openSettings': () => Promise<IpcResult<void>>
-	'window:openRecentEmails': () => Promise<IpcResult<void>>
+	'window:openRecentEmails': (accountId?: string) => Promise<IpcResult<void>>
 }
 
 export const IPC_CHANNELS = [

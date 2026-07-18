@@ -10,9 +10,11 @@ export default function RecentEmailsView(): ReactElement {
 	useEffect(() => {
 		const loadRecent = async () => {
 			const api = getApi()
+			const params = new URLSearchParams(window.location.search)
+			const accountId = params.get('accountId') || undefined
 			if (api) {
 				try {
-					const res = await api['otp:getRecentParsedMessages']()
+					const res = await api['otp:getRecentParsedMessages'](accountId)
 					if (res.success && res.data) {
 						setRecentMessages(res.data)
 					} else {
