@@ -30,11 +30,17 @@ interface StoreApi<T> {
 }
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
-const windowStore = new Store<WindowStoreShape>({
-	name: 'window-state',
-	defaults: { settingsWindowState: { x: 120, y: 120, width: 840, height: 720 } },
-})
-const windowStoreApi = windowStore as unknown as StoreApi<WindowStoreShape>
+let _windowStoreApi: StoreApi<WindowStoreShape> | null = null
+const getWindowStoreApi = (): StoreApi<WindowStoreShape> => {
+	if (!_windowStoreApi) {
+		const store = new Store<WindowStoreShape>({
+			name: 'window-state',
+			defaults: { settingsWindowState: { x: 120, y: 120, width: 840, height: 720 } },
+		})
+		_windowStoreApi = store as unknown as StoreApi<WindowStoreShape>
+	}
+	return _windowStoreApi
+}
 
 let settingsWindow: BrowserWindow | null = null
 let pollWindow: BrowserWindow | null = null
@@ -46,32 +52,7 @@ if (process.platform === 'win32') {
 	app.setAppUserModelId(APP_ID)
 }
 
-const otpPollService = new OtpPollService({
-	logDirectory: () => app.getPath('logs'),
-	onOtpDetected: (otp) => {
-		settingsWindow?.webContents.send('otp:detected', otp)
-		pollWindow?.webContents.send('otp:detected', otp)
-		tray?.onOtpDetected()
-	},
-	onOtpExpired: (otpId) => {
-		settingsWindow?.webContents.send('otp:expired', otpId)
-		pollWindow?.webContents.send('otp:expired', otpId)
-		tray?.refreshMenu()
-	},
-	onPollStatus: (status) => {
-		settingsWindow?.webContents.send('poll:status', status)
-		pollWindow?.webContents.send('poll:status', status)
-		tray?.refreshMenu()
-	},
-	onScanStarted: () => {
-		tray?.onScanStarted()
-	},
-	onScanFinished: () => {
-		tray?.onScanFinished()
-	},
-})
-
-setOtpPollService(otpPollService)
+let otpPollService: OtpPollService
 
 const rendererPath = (): string => join(app.getAppPath(), 'dist/renderer/index.html')
 const assetsPath = (): string => app.isPackaged ? join(process.resourcesPath, 'assets') : join(app.getAppPath(), 'assets')
@@ -98,7 +79,7 @@ const loadRendererView = async (
 
 const rememberSettingsBounds = (window: BrowserWindow): void => {
 	const bounds = window.getBounds()
-	windowStoreApi.set('settingsWindowState', {
+	getWindowStoreApi().set('settingsWindowState', {
 		x: bounds.x,
 		y: bounds.y,
 		width: bounds.width,
@@ -107,7 +88,7 @@ const rememberSettingsBounds = (window: BrowserWindow): void => {
 }
 
 const createSettingsWindow = (): BrowserWindow => {
-	const state = windowStoreApi.get('settingsWindowState')
+	const state = getWindowStoreApi().get('settingsWindowState')
 	const window = new BrowserWindow({
 		x: state.x,
 		y: state.y,
@@ -240,6 +221,32 @@ const openPollWindow = (account: Account): void => {
 }
 
 app.whenReady().then(() => {
+	otpPollService = new OtpPollService({
+		logDirectory: () => app.getPath('logs'),
+		onOtpDetected: (otp) => {
+			settingsWindow?.webContents.send('otp:detected', otp)
+			pollWindow?.webContents.send('otp:detected', otp)
+			tray?.onOtpDetected()
+		},
+		onOtpExpired: (otpId) => {
+			settingsWindow?.webContents.send('otp:expired', otpId)
+			pollWindow?.webContents.send('otp:expired', otpId)
+			tray?.refreshMenu()
+		},
+		onPollStatus: (status) => {
+			settingsWindow?.webContents.send('poll:status', status)
+			pollWindow?.webContents.send('poll:status', status)
+			tray?.refreshMenu()
+		},
+		onScanStarted: () => {
+			tray?.onScanStarted()
+		},
+		onScanFinished: () => {
+			tray?.onScanFinished()
+		},
+	})
+	setOtpPollService(otpPollService)
+
 	process.on('uncaughtException', (error: Error) => {
 		console.error('Uncaught exception in main process:', error.message)
 	})
