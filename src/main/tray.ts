@@ -96,8 +96,9 @@ export class TrayController {
 
 	constructor(context: TrayContext) {
 		this.context = context
-		this.normalIcon = this.loadIcon('2FAst.png')
-		this.activeIcon = this.loadIcon('2FAst.png')
+		const iconFile = process.platform === 'win32' ? '2FAst.ico' : '2FAst.png'
+		this.normalIcon = this.loadIcon(iconFile)
+		this.activeIcon = this.loadIcon(iconFile)
 		this.tray = new Tray(this.normalIcon)
 		this.tray.setToolTip('2Fast')
 		this.tray.on('click', () => {
@@ -151,6 +152,6 @@ export class TrayController {
 		if (process.platform === 'darwin' && file.includes('Template')) {
 			image.setTemplateImage(true)
 		}
-		return image.isEmpty() ? nativeImage.createEmpty() : image.resize({ width: 24, height: 24, quality: 'good' })
+		return image.isEmpty() ? nativeImage.createEmpty() : image
 	}
 }

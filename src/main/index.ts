@@ -56,7 +56,7 @@ let otpPollService: OtpPollService
 
 const rendererPath = (): string => join(app.getAppPath(), 'dist/renderer/index.html')
 const assetsPath = (): string => app.isPackaged ? join(process.resourcesPath, 'assets') : join(app.getAppPath(), 'assets')
-const appIconPath = (): string => join(assetsPath(), '2FAst.png')
+const appIconPath = (): string => join(assetsPath(), process.platform === 'win32' ? '2FAst.ico' : '2FAst.png')
 
 const loadRendererView = async (
 	window: BrowserWindow,
