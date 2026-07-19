@@ -41,6 +41,7 @@ export const setOtpPollService = (service: OtpPollService): void => {
 
 let onOpenSettingsCallback: (() => void) | null = null
 let onOpenRecentEmailsCallback: ((accountId?: string) => void) | null = null
+let onCloseRecentEmailsCallback: (() => void) | null = null
 
 /**
  * Injects the open settings window callback.
@@ -58,6 +59,15 @@ export const setOnOpenSettings = (callback: () => void): void => {
  */
 export const setOnOpenRecentEmails = (callback: (accountId?: string) => void): void => {
 	onOpenRecentEmailsCallback = callback
+}
+
+/**
+ * Injects the close recent emails window callback.
+ * @param callback Callback function.
+ * @returns Void.
+ */
+export const setOnCloseRecentEmails = (callback: () => void): void => {
+	onCloseRecentEmailsCallback = callback
 }
 
 const registerIpcHandlers = (): void => {
@@ -176,6 +186,14 @@ const registerIpcHandlers = (): void => {
 		try {
 			if (onOpenRecentEmailsCallback) {
 				onOpenRecentEmailsCallback(typeof accountId === 'string' ? accountId : undefined)
+			}
+			return { success: true }
+		} catch (error) { return formatError(error) }
+	})
+	ipcMain.handle('window:closeRecentEmails', async (): Promise<IpcResult<void>> => {
+		try {
+			if (onCloseRecentEmailsCallback) {
+				onCloseRecentEmailsCallback()
 			}
 			return { success: true }
 		} catch (error) { return formatError(error) }

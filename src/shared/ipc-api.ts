@@ -124,6 +124,7 @@ export interface IpcApi {
 	'window:minimize': () => Promise<IpcResult<void>>
 	'window:openSettings': () => Promise<IpcResult<void>>
 	'window:openRecentEmails': (accountId?: string) => Promise<IpcResult<void>>
+	'window:closeRecentEmails': () => Promise<IpcResult<void>>
 }
 
 export const IPC_CHANNELS = [

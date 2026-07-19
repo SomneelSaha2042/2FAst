@@ -54,6 +54,22 @@ function PollView(): ReactElement {
 		automaticPollScans.activeKeys.delete(key)
 	}, [])
 
+	const isAccountExpired = Boolean(
+		error &&
+			(error.toLowerCase().includes('reconnect') ||
+				error.toLowerCase().includes('token') ||
+				error.toLowerCase().includes('expired') ||
+				error.toLowerCase().includes('credential') ||
+				error.toLowerCase().includes('permission'))
+	)
+
+	useEffect(() => {
+		if (isAccountExpired) {
+			const api = getApi()
+			if (api) void api['window:closeRecentEmails']()
+		}
+	}, [isAccountExpired])
+
 	useEffect(() => {
 		const startAutomaticScan = (payload: PollStartPayload): void => {
 			setTarget(payload)
@@ -216,9 +232,13 @@ function PollView(): ReactElement {
 					{/* Candidates list */}
 					<div className="flex-1 flex flex-col gap-2 mt-4 min-h-0">
 						<div className="flex items-center justify-between mb-2 shrink-0">
-							<button type="button" onClick={() => void openRecentEmailsWindow(target?.accountId)} className="text-[10px] text-primary hover:underline cursor-pointer select-none">
-								Missed an OTP? View recent emails
-							</button>
+							{!isAccountExpired ? (
+								<button type="button" onClick={() => void openRecentEmailsWindow(target?.accountId)} className="text-[10px] text-primary hover:underline cursor-pointer select-none">
+									Missed an OTP? View recent emails
+								</button>
+							) : (
+								<div />
+							)}
 							<span className="text-[11px] font-label-md select-none text-secondary/80">LIVE</span>
 						</div>
 

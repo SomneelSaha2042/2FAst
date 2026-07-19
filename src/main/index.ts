@@ -2,7 +2,7 @@ import { app, BrowserWindow, Menu } from 'electron'
 import Store from 'electron-store'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { setOtpPollService, setOnOpenSettings, setOnOpenRecentEmails } from './ipc/index.js'
+import { setOtpPollService, setOnOpenSettings, setOnOpenRecentEmails, setOnCloseRecentEmails } from './ipc/index.js'
 import { loadGoogleOAuthConfig } from './oauth/google-config.js'
 import { OtpPollService } from './otp/poll-service.js'
 import { TrayController } from './tray.js'
@@ -214,6 +214,9 @@ const openPollWindow = (account: Account): void => {
 	if (!pollWindow) {
 		pollWindow = createPollWindow()
 	}
+	if (recentEmailsWindow && !recentEmailsWindow.isDestroyed()) {
+		recentEmailsWindow.hide()
+	}
 	const payload = toPollStartPayload(account)
 	void loadRendererView(pollWindow, 'poll', payload).then(() => {
 		pollWindow?.show()
@@ -288,6 +291,12 @@ app.whenReady().then(() => {
 		})
 	}
 	setOnOpenRecentEmails(openRecentEmailsWindow)
+	
+	setOnCloseRecentEmails(() => {
+		if (recentEmailsWindow && !recentEmailsWindow.isDestroyed()) {
+			recentEmailsWindow.hide()
+		}
+	})
 
 	const settings = getOtpSettings()
 	setAutoLaunch(settings.launchOnStartup)

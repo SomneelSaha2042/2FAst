@@ -34,6 +34,7 @@ const api: { [K in keyof IpcApi]: IpcApi[K] } = {
 	'window:minimize': () => ipcRenderer.invoke('window:minimize'),
 	'window:openSettings': () => ipcRenderer.invoke('window:openSettings'),
 	'window:openRecentEmails': (accountId) => ipcRenderer.invoke('window:openRecentEmails', accountId),
+	'window:closeRecentEmails': () => ipcRenderer.invoke('window:closeRecentEmails'),
 }
 
 const events: EventApi = {
