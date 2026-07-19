@@ -9,11 +9,20 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 	const [candidates, setCandidates] = useState<readonly OtpResult[]>([])
 	const [copiedCode, setCopiedCode] = useState<string | null>(null)
 	const [error, setError] = useState<string | null>(null)
+
+	const isAccountExpired = Boolean(
+		error &&
+			(error.toLowerCase().includes('reconnect') ||
+				error.toLowerCase().includes('token') ||
+				error.toLowerCase().includes('expired') ||
+				error.toLowerCase().includes('credential') ||
+				error.toLowerCase().includes('permission'))
+	)
 	const selectedAccount = useMemo(() =>
 		props.accounts.find((a) => a.id === selectedAccountId) || props.accounts[0],
 	[props.accounts, selectedAccountId])
 
-	const runScan = useCallback(async (accountId: string): Promise<void> => {
+	const runScan = useCallback(async (accountId: string, isCurrent: () => boolean): Promise<void> => {
 		const api = getApi()
 		if (!api) {
 			setError('Preload bridge unavailable.')
@@ -26,6 +35,7 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 		setError(null)
 		try {
 			const result = await api['poll:scanAccount'](accountId)
+			if (!isCurrent()) return
 			if (!result.success || !result.data) {
 				setError(result.error ?? 'Failed to inspect latest emails')
 				setScanState('error')
@@ -34,6 +44,7 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 			setCandidates(result.data)
 			setScanState('complete')
 		} catch (requestError) {
+			if (!isCurrent()) return
 			const message = requestError instanceof Error ? requestError.message : 'Failed to inspect emails'
 			setError(message)
 			setScanState('error')
@@ -42,7 +53,11 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 
 	useEffect(() => {
 		if (selectedAccount) {
-			void runScan(selectedAccount.id)
+			let isCurrent = true
+			void runScan(selectedAccount.id, () => isCurrent)
+			return () => {
+				isCurrent = false
+			}
 		}
 	}, [selectedAccount, runScan])
 
@@ -100,7 +115,7 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 									type="button"
 									disabled={scanState === 'scanning'}
 									className="px-4 py-1.5 bg-surface border border-outline-variant hover:bg-surface-variant transition-colors font-label-md text-on-surface cursor-pointer flex items-center gap-2"
-									onClick={() => void runScan(selectedAccount.id)}
+									onClick={() => void runScan(selectedAccount.id, () => true)}
 								>
 									<span className="material-symbols-outlined text-xs">sync</span>
 									Scan Again
@@ -124,9 +139,13 @@ function CodesDashboard(props: { readonly accounts: readonly Account[] }): React
 						{/* Candidates codes list */}
 						<div className="space-y-2 text-left">
 							<div className="flex items-center justify-between mb-1 select-none">
-								<button type="button" onClick={() => void openRecentEmailsWindow()} className="text-[11px] text-primary hover:underline cursor-pointer">
-									Missed an OTP? View recent emails
-								</button>
+								{!isAccountExpired ? (
+									<button type="button" onClick={() => void openRecentEmailsWindow(selectedAccount.id)} className="text-[11px] text-primary hover:underline cursor-pointer">
+										Missed an OTP? View recent emails
+									</button>
+								) : (
+									<div />
+								)}
 								<span className="font-label-md text-secondary/80 uppercase tracking-wider">LIVE</span>
 							</div>
 
