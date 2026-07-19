@@ -61,14 +61,16 @@ const appIconPath = (): string => join(assetsPath(), process.platform === 'win32
 const loadRendererView = async (
 	window: BrowserWindow,
 	view: 'settings' | 'poll' | 'recent-emails',
-	payload?: PollStartPayload
+	payload?: PollStartPayload | { accountId: string }
 ): Promise<void> => {
 	const devServerUrl = process.env.VITE_DEV_SERVER_URL || (!app.isPackaged ? 'http://localhost:5173' : undefined)
 	const params = new URLSearchParams({ view })
 	if (payload) {
 		params.set('accountId', payload.accountId)
-		params.set('email', payload.email)
-		params.set('provider', payload.provider)
+		if ('email' in payload) {
+			params.set('email', payload.email)
+			params.set('provider', payload.provider)
+		}
 	}
 	if (devServerUrl) {
 		await window.loadURL(`${devServerUrl}?${params.toString()}`)
@@ -279,7 +281,7 @@ app.whenReady().then(() => {
 		if (!recentEmailsWindow) {
 			recentEmailsWindow = createRecentEmailsWindow()
 		}
-		const payload = accountId ? { accountId, email: '', provider: 'gmail' as const } : undefined
+		const payload = accountId ? { accountId } : undefined
 		void loadRendererView(recentEmailsWindow, 'recent-emails', payload).then(() => {
 			recentEmailsWindow?.show()
 			recentEmailsWindow?.focus()

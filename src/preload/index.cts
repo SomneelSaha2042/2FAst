@@ -22,7 +22,7 @@ const api: { [K in keyof IpcApi]: IpcApi[K] } = {
 	'otp:copy': (otpId) => ipcRenderer.invoke('otp:copy', otpId),
 	'otp:getHistory': () => ipcRenderer.invoke('otp:getHistory'),
 	'otp:clearHistory': () => ipcRenderer.invoke('otp:clearHistory'),
-	'otp:getRecentParsedMessages': () => ipcRenderer.invoke('otp:getRecentParsedMessages'),
+	'otp:getRecentParsedMessages': (accountId) => ipcRenderer.invoke('otp:getRecentParsedMessages', accountId),
 	'poll:pause': () => ipcRenderer.invoke('poll:pause'),
 	'poll:resume': () => ipcRenderer.invoke('poll:resume'),
 	'poll:setInterval': (ms) => ipcRenderer.invoke('poll:setInterval', ms),
@@ -33,7 +33,7 @@ const api: { [K in keyof IpcApi]: IpcApi[K] } = {
 	'window:hide': () => ipcRenderer.invoke('window:hide'),
 	'window:minimize': () => ipcRenderer.invoke('window:minimize'),
 	'window:openSettings': () => ipcRenderer.invoke('window:openSettings'),
-	'window:openRecentEmails': () => ipcRenderer.invoke('window:openRecentEmails'),
+	'window:openRecentEmails': (accountId) => ipcRenderer.invoke('window:openRecentEmails', accountId),
 }
 
 const events: EventApi = {

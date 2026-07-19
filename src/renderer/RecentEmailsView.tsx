@@ -26,9 +26,6 @@ export default function RecentEmailsView(): ReactElement {
 			}
 		}
 		void loadRecent()
-		
-		window.addEventListener('focus', loadRecent)
-		return () => window.removeEventListener('focus', loadRecent)
 	}, [])
 
 	return (

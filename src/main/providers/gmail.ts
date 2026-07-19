@@ -228,7 +228,7 @@ export class GmailProvider implements MailProvider {
 
 
 	private async getClient(): Promise<gmail_v1.Gmail> {
-		if (this.cachedClient && this.lastTokenRefresh > Date.now() + 60_000) {
+		if (this.cachedClient && this.lastTokenRefresh > 0 && Date.now() - this.lastTokenRefresh < 60_000) {
 			return this.cachedClient
 		}
 		const tokens = await loadTokens(this.accountId)
@@ -261,7 +261,7 @@ export class GmailProvider implements MailProvider {
 		})
 		
 		this.cachedClient = google.gmail({ version: 'v1', auth: oauthClient })
-		this.lastTokenRefresh = validTokens.expiresAt
+		this.lastTokenRefresh = Date.now()
 		return this.cachedClient
 	}
 }
