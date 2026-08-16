@@ -3,6 +3,7 @@ productName: 2Fast
 copyright: Copyright (c) 2026
 asar: false
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+afterPack: scripts/after-pack.mjs
 
 directories:
   output: release

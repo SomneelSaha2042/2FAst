@@ -1,7 +1,8 @@
-import { access, readdir } from 'node:fs/promises'
-import { constants } from 'node:fs'
+import { access, cp, mkdir, readFile, readdir } from 'node:fs/promises'
+import { constants, existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import process from 'node:process'
 
 const appName = '2Fast'
 
@@ -75,13 +76,70 @@ const runRcedit = async (rceditPath, exePath, iconPath) =>
 		)
 	})
 
-export default async function afterPack(context) {
-	if (context.electronPlatformName !== 'win32') {
+const copyMissingDependencies = async (projectDir, appOutDir) => {
+	const rootPkgPath = join(projectDir, 'package.json')
+	const rootPkg = JSON.parse(await readFile(rootPkgPath, 'utf-8'))
+	const prodDeps = Object.keys(rootPkg.dependencies || {})
+
+	const visited = new Set()
+	const toVisit = [...prodDeps]
+	const rootNodeModules = join(projectDir, 'node_modules')
+
+	while (toVisit.length > 0) {
+		const dep = toVisit.pop()
+		if (!dep || visited.has(dep)) continue
+		visited.add(dep)
+
+		const pkgJsonPath = join(rootNodeModules, dep, 'package.json')
+		if (existsSync(pkgJsonPath)) {
+			try {
+				const pkg = JSON.parse(await readFile(pkgJsonPath, 'utf-8'))
+				const subDeps = { ...(pkg.dependencies || {}), ...(pkg.optionalDependencies || {}) }
+				for (const sub of Object.keys(subDeps)) {
+					if (!visited.has(sub)) {
+						toVisit.push(sub)
+					}
+				}
+			} catch {
+				// Ignore JSON parse errors for non-standard packages
+			}
+		}
+	}
+
+	const targetNodeModules = join(appOutDir, 'resources', 'app', 'node_modules')
+	if (!(await pathExists(targetNodeModules))) {
 		return
 	}
 
-	const exePath = join(context.appOutDir, '2Fast.exe')
-	const iconPath = resolve('assets/icon.ico')
-	const rceditPath = await findRcedit()
-	await runRcedit(rceditPath, exePath, iconPath)
+	for (const dep of visited) {
+		const source = join(rootNodeModules, dep)
+		const target = join(targetNodeModules, dep)
+		if (existsSync(source) && !existsSync(target)) {
+			await mkdir(dirname(target), { recursive: true })
+			await cp(source, target, { recursive: true, dereference: true })
+		}
+	}
+}
+
+const runRceditIfAvailable = async (appOutDir) => {
+	try {
+		const exePath = join(appOutDir, '2Fast.exe')
+		const iconPath = resolve('assets/2FAst.ico')
+		if (!(await pathExists(iconPath)) || !(await pathExists(exePath))) {
+			return
+		}
+		const rceditPath = await findRcedit()
+		await runRcedit(rceditPath, exePath, iconPath)
+	} catch {
+		// Non-fatal if rcedit is not available
+	}
+}
+
+export default async function afterPack(context) {
+	const projectDir = context.packager?.projectDir || process.cwd()
+	await copyMissingDependencies(projectDir, context.appOutDir)
+
+	if (context.electronPlatformName === 'win32') {
+		await runRceditIfAvailable(context.appOutDir)
+	}
 }
