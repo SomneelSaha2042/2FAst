@@ -1,7 +1,7 @@
 appId: com.2fast.app
 productName: 2Fast
 copyright: Copyright (c) 2026
-asar: true
+asar: false
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
 directories:
@@ -14,6 +14,9 @@ files:
   - node_modules/**/*
   - '!dist/**/*.d.ts'
   - '!dist/**/*.tsbuildinfo'
+  - '!node_modules/.pnpm/**/*'
+  - '!node_modules/.modules.yaml'
+  - '!node_modules/.package-lock.json'
 
 extraResources:
   - from: assets
